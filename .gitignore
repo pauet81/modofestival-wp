@@ -41,3 +41,14 @@ wp-content/plugins/*
 !wp-content/mu-plugins/
 wp-content/mu-plugins/*
 !wp-content/mu-plugins/*.php
+
+# Archivos raíz no versionables del sitio
+/SESSION_NOTES.md
+/ads.txt
+/awin-conversion.php
+/favicon.ico
+/feedarchive.xml
+/google70f17482c261bebf.html
+/impact-conversion.php
+/llms.txt
+/robots.txt
