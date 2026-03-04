@@ -162,6 +162,9 @@ class MFU_Festival_Taxonomy {
 			return $content;
 		}
 
+		// Avoid duplicate render when legacy markup already exists in content.
+		$content = self::strip_terms_block_markup( $content );
+
 		$block = '<div class="mfu-festival-terms"><strong>Festivales relacionados:</strong> ' . implode( ', ', $links ) . '</div>';
 		return $content . $block;
 	}
@@ -181,7 +184,10 @@ class MFU_Festival_Taxonomy {
 	}
 
 	public static function strip_terms_block_markup( $content ) {
-		return preg_replace( '/<div\\s+class=\"mfu-festival-terms\"[^>]*>.*?<\\/div>/is', '', (string) $content );
+		$content = (string) $content;
+		$content = preg_replace( '/<div\\s+class=\"mfu-festival-terms\"[^>]*>.*?<\\/div>/is', '', $content );
+		$content = preg_replace( '/<p[^>]*>\\s*(?:<strong>)?\\s*Festivales\\s+relacionados:\\s*(?:<\\/strong>)?.*?<\\/p>/is', '', $content );
+		return $content;
 	}
 
 	public static function sanitize_posts_on_non_single( $posts, $query ) {
