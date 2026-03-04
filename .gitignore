@@ -1,0 +1,43 @@
+# WordPress core
+/wp-admin/
+/wp-includes/
+/wp-*.php
+/index.php
+/license.txt
+/readme.html
+/xmlrpc.php
+
+# Config sensible
+wp-config.php
+.env
+*.log
+error_log
+
+# Archivos sueltos/no necesarios en repo
+/.htaccess
+/.user.ini
+/2LeExtY3OE_qjohhoEjNi
+/*.sql
+/*.zip
+
+# Contenido no versionable
+/wp-content/uploads/
+/wp-content/cache/
+/wp-content/litespeed/
+/wp-content/upgrade/
+/wp-content/backups/
+
+# Mantener solo tema/plugin/mu-plugins propios
+!wp-content/
+wp-content/*
+!wp-content/themes/
+wp-content/themes/*
+!wp-content/themes/Avada-Modofestival/
+
+!wp-content/plugins/
+wp-content/plugins/*
+!wp-content/plugins/modo-festival-updater/
+
+!wp-content/mu-plugins/
+wp-content/mu-plugins/*
+!wp-content/mu-plugins/*.php

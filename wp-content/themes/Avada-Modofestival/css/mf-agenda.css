@@ -1,0 +1,969 @@
+/**
+ * MODOFESTIVAL - AGENDA DE FESTIVALES
+ * CSS consolidado y optimizado
+ * Version: 2.0
+ */
+
+/* ==========================================================================
+   1. CONTENEDOR PRINCIPAL
+   ========================================================================== */
+
+.mf-agenda-wrapper {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* ==========================================================================
+   2. FIXES CRÍTICOS: Z-INDEX Y FOOTER
+   ========================================================================== */
+
+/* Footer con z-index bajo pero SIN isolation */
+.fusion-footer,
+.fusion-tb-footer,
+.fusion-footer-widget-area {
+    z-index: 1 !important;
+    isolation: auto !important;
+}
+
+/* CRÍTICO: Body y main NO pueden tener isolation */
+body,
+#main,
+#wrapper,
+.fusion-fullwidth {
+    isolation: auto !important;
+    transform: none !important;
+}
+
+/* ==========================================================================
+   3. SPINNER LOADING FULLSCREEN
+   ========================================================================== */
+
+.mf-loading-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 2147483646;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.mf-loading-overlay--visible {
+    display: flex;
+}
+.mf-loading-text {
+    font-size: 14px;
+    color: #7f8c8d;
+    text-align: center;
+}
+
+
+
+.mf-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #167baa;
+    border-radius: 50%;
+    animation: mf-spin 1s linear infinite;
+}
+
+@keyframes mf-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+
+/* ==========================================================================
+   4. CARRUSEL DE ÚLTIMOS ACTUALIZADOS
+   ========================================================================== */
+
+.mf-ticker-wrapper {
+    margin: 16px 0;
+    overflow: hidden;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+}
+
+.mf-ticker-label {
+    color: #7f8c8d;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+
+.mf-ticker {
+    overflow: hidden;
+}
+
+.mf-ticker-content {
+    display: flex;
+    animation: mf-scroll 40s linear infinite;
+}
+
+.mf-ticker-item {
+    display: inline-block;
+    white-space: nowrap;
+    padding: 4px 12px;
+    background: white;
+    border-radius: 12px;
+    margin-right: 8px;
+    color: #2c3e50;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 1px solid #e0e0e0;
+}
+
+.mf-ticker-item:hover {
+    background: #27ae60;
+    color: white;
+    border-color: #27ae60;
+}
+
+
+@keyframes mf-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+/* Móvil: ocultar carrusel */
+@media (max-width: 768px) {
+    .mf-ticker-wrapper {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   5. LIVE SEARCH
+   ========================================================================== */
+
+.mf-search-wrapper {
+    margin: 32px 0;
+    position: relative;
+    background: #f8f9fa;
+    padding: 28px 24px;
+    border-radius: 12px;
+}
+
+.mf-search-container {
+    position: relative;
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+
+.mf-search-input {
+    flex: 1;
+    padding: 14px 48px 14px 20px;
+    border: 2px solid #bdc3c7;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    outline: none;
+    background: white;
+}
+
+.mf-search-input:focus {
+    border-color: #27ae60;
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+}
+
+.mf-search-input::placeholder {
+    color: #95a5a6;
+}
+
+
+
+.mf-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mf-search-clear:hover {
+    background: #c0392b;
+    transform: translateY(-50%) scale(1.1);
+}
+
+
+.mf-search-results {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.mf-search-results-inner {
+    padding: 8px;
+}
+
+.mf-search-result-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s ease;
+}
+
+.mf-search-result-item:hover {
+    background: #f5f5f5;
+}
+
+.mf-search-result-image {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.mf-search-result-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mf-search-result-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.mf-search-result-title {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+    color: #2c3e50;
+}
+
+.mf-search-result-meta {
+    font-size: 13px;
+    color: #7f8c8d;
+}
+
+.mf-search-loading,
+.mf-search-no-results,
+.mf-search-error {
+    padding: 24px;
+    text-align: center;
+    color: #7f8c8d;
+}
+
+.mf-search-result-more {
+    padding: 12px;
+    text-align: center;
+    font-size: 13px;
+    color: #167baa;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 8px;
+}
+
+/* ==========================================================================
+   6. BOTONES FLOTANTES MÓVIL
+   ========================================================================== */
+
+.mf-filtros-toggle,
+.mf-busqueda-floater {
+    position: fixed;
+    bottom: 20px;
+    background: #167baa;
+    color: white;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 15px;
+    box-shadow: 0 4px 12px rgba(22, 123, 170, 0.4);
+    cursor: pointer;
+    z-index: 999;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.mf-filtros-toggle {
+    right: 20px;
+}
+
+.mf-busqueda-floater {
+    left: 20px;
+}
+
+.mf-filtros-toggle-visible {
+    display: flex !important;
+}
+
+.mf-filtros-toggle:active,
+.mf-busqueda-floater:active {
+    transform: scale(0.95);
+}
+
+.mf-filtros-badge {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Móvil: Botones flotantes y modal sobre footer */
+@media (max-width: 768px) {
+    .mf-filtros-toggle,
+    .mf-busqueda-floater {
+        position: fixed !important;
+        z-index: 2147483647 !important;
+        bottom: 20px !important;
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: inline-flex !important;
+    }
+    
+    .mf-filtros-toggle {
+        right: 20px !important;
+    }
+    
+    .mf-busqueda-floater {
+        left: 20px !important;
+    }
+    
+    .mf-filtros-wrapper.mf-filtros-modal {
+        z-index: 2147483646 !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+    }
+    
+    .mf-filtros-overlay {
+        z-index: 2147483645 !important;
+        position: fixed !important;
+    }
+    
+    /* Ocultar botones cuando modal está abierto */
+    body.mf-no-scroll .mf-filtros-toggle,
+    body.mf-no-scroll .mf-busqueda-floater {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .mf-filtros-toggle,
+    .mf-busqueda-floater {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
+   7. OVERLAY MÓVIL
+   ========================================================================== */
+
+.mf-filtros-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+}
+
+.mf-filtros-overlay-visible {
+    display: block;
+}
+
+body.mf-no-scroll {
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   8. FILTROS
+   ========================================================================== */
+
+.mf-filtros-wrapper {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+}
+
+.mf-filtros-header {
+    display: none;
+}
+
+.mf-filtros-titulo {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.mf-filtros-cerrar {
+    background: none;
+    border: none;
+    font-size: 32px;
+    color: #7f8c8d;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.mf-filtros {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.mf-filtro {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mf-filtro:focus {
+    outline: none;
+    border-color: #167baa;
+    box-shadow: 0 0 0 3px rgba(22, 123, 170, 0.1);
+}
+
+.mf-btn-limpiar {
+    grid-column: 1 / -1;
+    padding: 12px 24px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 8px;
+}
+
+.mf-btn-limpiar:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+}
+
+/* Chips de filtros aplicados */
+.mf-filtros-aplicados {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.mf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #167baa;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #2c3e50;
+}
+
+.mf-chip-text strong {
+    color: #167baa;
+}
+
+.mf-chip-remove {
+    background: #167baa;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mf-chip-remove:hover {
+    background: #125a82;
+    transform: scale(1.1);
+}
+
+/* Modal móvil */
+@media (max-width: 768px) {
+    .mf-filtros-wrapper.mf-filtros-modal {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        z-index: 2147483645 !important; /* SOLO ESTA línea de z-index */
+        right: 0;
+        max-height: 85vh;
+        overflow-y: auto;
+        background: white;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+    }
+    
+    .mf-filtros-modal .mf-filtros-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .mf-filtros {
+        grid-template-columns: 1fr;
+    }
+    
+    .mf-filtro {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 44px !important;
+        height: 44px !important;
+        font-size: 14px !important;
+        padding: 8px 12px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .mf-filtro option {
+        font-size: 14px !important;
+    }
+}
+
+/* ==========================================================================
+   9. MÁRGENES EN MÓVIL
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    #main,
+    .post-content,
+    #content {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    
+    .mf-agenda-wrapper {
+        padding-left: 0;
+        padding-right: 0;
+    }
+    
+    .mf-ticker-wrapper,
+    .mf-search-wrapper,
+    .mf-filtros-wrapper,
+    .mf-grid,
+    .mf-resultados-info,
+    .mf-cargar-mas {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+/* ==========================================================================
+   10. ANUNCIOS AFTER FILTERS
+   ========================================================================== */
+
+.mf-ad-after-filters {
+    margin: 24px 0;
+    text-align: center;
+}
+
+.mf-ad-after-desktop,
+.mf-ad-after-mobile-top,
+.mf-ad-after-mobile-bottom {
+    margin: 0 auto;
+}
+
+.mf-ad-after-mobile-top,
+.mf-ad-after-mobile-bottom {
+    display: none;
+    width: 320px !important;
+    max-width: 100% !important;
+    height: 100px !important;
+    max-height: 100px !important;
+    overflow: hidden !important;
+    margin: 24px auto !important;
+    padding: 16px 0;
+}
+
+.mf-ad-after-mobile-top .adsbygoogle,
+.mf-ad-after-mobile-bottom .adsbygoogle {
+    width: 320px !important;
+    height: 100px !important;
+    max-width: 320px !important;
+    max-height: 100px !important;
+}
+
+@media (min-width: 769px) {
+    .mf-ad-after-mobile-top,
+    .mf-ad-after-mobile-bottom {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .mf-ad-after-desktop {
+        display: none !important;
+    }
+    
+    .mf-ad-after-mobile-top,
+    .mf-ad-after-mobile-bottom {
+        display: block !important;
+    }
+}
+
+/* ==========================================================================
+   11. GRID DE FESTIVALES
+   ========================================================================== */
+
+.mf-festivales-container {
+    margin: 32px 0;
+}
+
+.mf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .mf-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
+/* ==========================================================================
+   12. CARD DE FESTIVAL
+   ========================================================================== */
+
+.mf-card {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+
+.mf-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.mf-card__image {
+    position: relative;
+    display: block;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+}
+
+.mf-card__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.mf-card:hover .mf-card__image img {
+    transform: scale(1.05);
+}
+
+/* Badges */
+.mf-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 2;
+}
+
+
+.mf-badge--edicion {
+    background: rgba(22, 123, 170, 0.95);
+    color: white;
+}
+
+.mf-badge--cancelado {
+    background: rgba(231, 76, 60, 0.95);
+    color: white;
+}
+
+.mf-badge--sin-fechas {
+    background: rgba(241, 196, 15, 0.95);
+    color: #2c3e50;
+}
+
+/* Badge de cuenta atrás */
+.mf-card-countdown {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+}
+
+.mf-countdown-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2c3e50;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(22, 123, 170, 0.2);
+}
+
+.mf-countdown-hoy {
+    background: #167baa;
+    color: white;
+    border: none;
+}
+
+.mf-countdown-en-curso {
+    background: #27ae60;
+    color: white;
+    border: none;
+}
+
+.mf-countdown-urgente {
+    background: #e67e22;
+    color: white;
+    border: none;
+}
+
+.mf-countdown-pronto {
+    background: #3498db;
+    color: white;
+    border: none;
+}
+
+.mf-countdown-celebrado {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    opacity: 0.85;
+}
+
+/* Contenido */
+.mf-card__content {
+    padding: 16px;
+    flex: 1;
+}
+
+
+.mf-card__title {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.mf-card__title a {
+    color: #2c3e50;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.mf-card__title a:hover {
+    color: #167baa;
+}
+
+.mf-card__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #7f8c8d;
+    font-size: 14px;
+}
+
+.mf-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mf-meta__estilo {
+    color: #167baa;
+    font-weight: 600;
+}
+
+/* Acciones */
+.mf-card__actions {
+    padding: 12px 16px;
+    margin-top: auto;
+    border-top: 1px solid #f0f0f0;
+}
+
+.mf-btn-entradas {
+    display: inline-block;
+    width: 100%;
+    padding: 8px 16px;
+    background: transparent;
+    color: #27ae60;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    border: 1px solid #27ae60;
+    transition: all 0.3s ease;
+}
+
+.mf-btn-entradas:hover {
+    background: #27ae60;
+    color: white;
+    transform: translateY(-1px);
+}
+
+
+/* ==========================================================================
+   13. ANUNCIOS IN-FEED
+   ========================================================================== */
+
+.mf-card-ad {
+    width: 100%;
+    margin: 16px 0;
+}
+
+.mf-ad-infeed {
+    min-height: 100px;
+}
+
+/* Ocultar anuncios vacíos */
+.mf-card-ad.mf-ad-empty {
+    display: none !important;
+}
+
+@media (min-width: 769px) {
+    .mf-ad-infeed-desktop {
+        display: block;
+    }
+    .mf-ad-infeed-mobile {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .mf-ad-infeed-desktop {
+        display: none !important;
+    }
+    .mf-ad-infeed-mobile {
+        display: block;
+        width: 320px;
+        max-width: 100%;
+        height: 100px;
+        margin: 16px auto;
+        overflow: hidden;
+    }
+}
+
+/* ==========================================================================
+   14. RESULTADOS Y CARGAR MÁS
+   ========================================================================== */
+
+.mf-resultados-info {
+    text-align: center;
+    color: #7f8c8d;
+    font-size: 14px;
+    margin: 16px 0;
+}
+
+.mf-loading {
+    text-align: center;
+    padding: 24px;
+    color: #7f8c8d;
+}
+
+.mf-cargar-mas {
+    display: block;
+    margin: 24px auto;
+    padding: 14px 32px;
+    background: #167baa;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mf-cargar-mas:hover {
+    background: #125a82;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(22, 123, 170, 0.3);
+}
+
+.mf-no-results {
+    text-align: center;
+    padding: 48px 24px;
+    color: #7f8c8d;
+}
+
+.mf-no-results p {
+    font-size: 16px;
+    margin: 0;
+}
