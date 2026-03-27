@@ -2767,9 +2767,13 @@ class MFU_Admin {
 					}
 					echo '</td>';
 					echo '<td>' . esc_html( (string) ( $before['edicion'] ?? '' ) ) . ' -> <strong>' . esc_html( (string) ( $after['edicion'] ?? '' ) ) . '</strong></td>';
+					$before_start = $this->format_date_value( (string) ( $before['fecha_inicio'] ?? '' ) );
+					$before_end = $this->format_date_value( (string) ( $before['fecha_fin'] ?? '' ) );
+					$after_start = $this->format_date_value( (string) ( $after['fecha_inicio'] ?? '' ) );
+					$after_end = $this->format_date_value( (string) ( $after['fecha_fin'] ?? '' ) );
 					echo '<td>';
-					echo 'Inicio: ' . esc_html( (string) ( $before['fecha_inicio'] ?? '' ) ) . ' -> <strong>' . esc_html( (string) ( $after['fecha_inicio'] ?? '' ) ) . '</strong><br />';
-					echo 'Fin: ' . esc_html( (string) ( $before['fecha_fin'] ?? '' ) ) . ' -> <strong>' . esc_html( (string) ( $after['fecha_fin'] ?? '' ) ) . '</strong>';
+					echo 'Inicio: ' . esc_html( (string) $before_start ) . ' -> <strong>' . esc_html( (string) $after_start ) . '</strong><br />';
+					echo 'Fin: ' . esc_html( (string) $before_end ) . ' -> <strong>' . esc_html( (string) $after_end ) . '</strong>';
 					echo '</td>';
 					echo '<td>';
 					echo 'Artistas: ' . ( trim( (string) ( $before['mf_artistas'] ?? '' ) ) !== '' ? 'SI' : 'NO' ) . ' -> <strong>NO</strong><br />';
@@ -2806,8 +2810,8 @@ class MFU_Admin {
 				}
 				echo '</td>';
 				echo '<td>' . esc_html( (string) $item['edition'] ) . '</td>';
-				echo '<td>' . esc_html( (string) $item['fecha_inicio'] ) . '</td>';
-				echo '<td>' . esc_html( (string) $item['fecha_fin'] ) . '</td>';
+				echo '<td>' . esc_html( (string) $this->format_date_value( (string) $item['fecha_inicio'] ) ) . '</td>';
+				echo '<td>' . esc_html( (string) $this->format_date_value( (string) $item['fecha_fin'] ) ) . '</td>';
 				echo '<td>' . esc_html( (string) $item['status'] ) . '</td>';
 				echo '</tr>';
 			}
@@ -7345,6 +7349,8 @@ private function test_apify_instagram( $token, $actor_id, $input_value, $max_pos
 		if ( $artistas === '' ) {
 			$artistas = get_post_meta( $festival_id, 'mf_artistas', true );
 		}
+		$fecha_inicio = $this->format_date_value( $fecha_inicio );
+		$fecha_fin = $this->format_date_value( $fecha_fin );
 		$localidad = $this->get_taxonomy_list( $festival_id, 'localidad' );
 		$estilos = $this->get_taxonomy_list( $festival_id, 'estilo_musical' );
 
