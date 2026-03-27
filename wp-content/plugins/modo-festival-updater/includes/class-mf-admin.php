@@ -425,6 +425,10 @@ class MFU_Admin {
 			return 'mfu_rollover_preview_' . (int) get_current_user_id();
 		}
 
+		private function get_rollover_applied_transient_key() {
+			return 'mfu_rollover_applied_' . (int) get_current_user_id();
+		}
+
 		private function build_rollover_preview_row( $festival_id, $from_year, $to_year ) {
 			$festival_id = (int) $festival_id;
 			$festival = get_post( $festival_id );
@@ -2713,6 +2717,8 @@ class MFU_Admin {
 			$candidates = $this->get_rollover_candidates( $from_year );
 			$preview_rows = get_transient( $this->get_rollover_preview_transient_key() );
 			$preview_rows = is_array( $preview_rows ) ? $preview_rows : array();
+			$applied_rows = get_transient( $this->get_rollover_applied_transient_key() );
+			$applied_rows = is_array( $applied_rows ) ? $applied_rows : array();
 
 			echo '<div class="wrap">';
 			echo '<h1>Rollover de edicion</h1>';
@@ -2740,6 +2746,30 @@ class MFU_Admin {
 				}
 				echo '</div>';
 				return;
+			}
+
+			if ( ! empty( $applied_rows ) ) {
+				echo '<h2>Rollover aplicado</h2>';
+				echo '<p>Festivales actualizados en la ultima ejecucion.</p>';
+				echo '<ul style="margin-bottom:14px;">';
+				foreach ( $applied_rows as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					$title = isset( $row['title'] ) ? (string) $row['title'] : '';
+					$edit_link = isset( $row['edit_link'] ) ? (string) $row['edit_link'] : '';
+					$view_link = isset( $row['view_link'] ) ? (string) $row['view_link'] : '';
+					echo '<li>';
+					echo '<strong>' . esc_html( $title ) . '</strong>';
+					if ( $edit_link !== '' ) {
+						echo ' - <a href="' . esc_url( $edit_link ) . '" target="_blank" rel="noopener">Ver festival (admin)</a>';
+					}
+					if ( $view_link !== '' ) {
+						echo ' | <a href="' . esc_url( $view_link ) . '" target="_blank" rel="noopener">Ver festival (web)</a>';
+					}
+					echo '</li>';
+				}
+				echo '</ul>';
 			}
 
 			if ( ! empty( $preview_rows ) ) {
@@ -2916,12 +2946,21 @@ class MFU_Admin {
 			}
 
 			$ok = 0;
+			$applied_rows = array();
 			foreach ( $ids as $festival_id ) {
-				if ( $this->apply_rollover_to_festival( (int) $festival_id, $from_year, $to_year ) ) {
+				$festival_id = (int) $festival_id;
+				if ( $this->apply_rollover_to_festival( $festival_id, $from_year, $to_year ) ) {
 					$ok++;
+					$applied_rows[] = array(
+						'id' => $festival_id,
+						'title' => (string) get_the_title( $festival_id ),
+						'edit_link' => (string) get_edit_post_link( $festival_id, '' ),
+						'view_link' => (string) get_permalink( $festival_id ),
+					);
 				}
 			}
 			delete_transient( $this->get_rollover_preview_transient_key() );
+			set_transient( $this->get_rollover_applied_transient_key(), $applied_rows, 20 * MINUTE_IN_SECONDS );
 
 			wp_safe_redirect( add_query_arg( 'mfu_msg', rawurlencode( 'Rollover aplicado: ' . $ok . ' festivales preparados para ' . $to_year . '.' ), $back ) );
 			exit;
