@@ -53,6 +53,7 @@ class MFU_Admin {
 				add_action( 'admin_post_mfu_press_release_process', array( $this, 'handle_press_release_process' ) );
 				add_action( 'admin_post_mfu_external_news_check', array( $this, 'handle_external_news_check' ) );
 				add_action( 'admin_post_mfu_external_news_process', array( $this, 'handle_external_news_process' ) );
+				add_action( 'admin_post_mfu_rollover_prepare', array( $this, 'handle_rollover_prepare' ) );
 		}
 
 	public function output_admin_styles() {
@@ -113,6 +114,14 @@ class MFU_Admin {
 				'manage_options',
 				'mfu-external-news',
 				array( $this, 'render_external_news_page' )
+			);
+			add_submenu_page(
+				'mfu-updates',
+				'Rollover edicion',
+				'Rollover edicion',
+				'manage_options',
+				'mfu-rollover',
+				array( $this, 'render_rollover_page' )
 			);
 			add_submenu_page(
 				'mfu-updates',
@@ -346,6 +355,70 @@ class MFU_Admin {
 				return $year . '-' . $month . '-' . $day;
 			}
 			return '';
+		}
+
+		private function date_string_to_timestamp( $value ) {
+			$normalized = $this->normalize_date_for_storage( $value );
+			if ( ! is_string( $normalized ) || ! preg_match( '/^\d{8}$/', $normalized ) ) {
+				return 0;
+			}
+			$year = (int) substr( $normalized, 0, 4 );
+			$month = (int) substr( $normalized, 4, 2 );
+			$day = (int) substr( $normalized, 6, 2 );
+			if ( $year <= 0 || $month <= 0 || $day <= 0 ) {
+				return 0;
+			}
+			return (int) mktime( 12, 0, 0, $month, $day, $year );
+		}
+
+		private function get_rollover_candidates( $from_year ) {
+			$from_year = (int) $from_year;
+			if ( $from_year <= 0 ) {
+				$from_year = (int) current_time( 'Y' );
+			}
+			$today = strtotime( gmdate( 'Y-m-d', current_time( 'timestamp' ) ) );
+			$candidates = array();
+
+			$festivals = get_posts(
+				array(
+					'post_type' => 'festi',
+					'post_status' => array( 'publish', 'draft' ),
+					'posts_per_page' => -1,
+					'orderby' => 'title',
+					'order' => 'ASC',
+				)
+			);
+			foreach ( $festivals as $festival ) {
+				$festival_id = (int) $festival->ID;
+				$edition = trim( (string) get_post_meta( $festival_id, 'edicion', true ) );
+				if ( (int) $edition !== $from_year ) {
+					continue;
+				}
+
+				$fecha_inicio = trim( (string) get_post_meta( $festival_id, 'fecha_inicio', true ) );
+				$fecha_fin = trim( (string) get_post_meta( $festival_id, 'fecha_fin', true ) );
+				$ts_start = $this->date_string_to_timestamp( $fecha_inicio );
+				$ts_end = $this->date_string_to_timestamp( $fecha_fin );
+				$event_ts = $ts_end > 0 ? $ts_end : $ts_start;
+				if ( $event_ts <= 0 ) {
+					continue;
+				}
+				if ( $event_ts >= $today ) {
+					continue;
+				}
+
+				$candidates[] = array(
+					'id' => $festival_id,
+					'title' => (string) $festival->post_title,
+					'status' => (string) $festival->post_status,
+					'edition' => $edition,
+					'fecha_inicio' => $fecha_inicio,
+					'fecha_fin' => $fecha_fin,
+					'link' => get_edit_post_link( $festival_id, '' ),
+				);
+			}
+
+			return $candidates;
 		}
 
 	private function parse_spanish_date( $value ) {
@@ -2583,6 +2656,171 @@ class MFU_Admin {
 
 			delete_transient( $this->get_external_news_transient_key() );
 			wp_safe_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Borrador creado.' ), 'post_id' => $post_id ), $back ) );
+			exit;
+		}
+
+		public function render_rollover_page() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return;
+			}
+
+			$from_year = isset( $_GET['from_year'] ) ? (int) $_GET['from_year'] : (int) current_time( 'Y' );
+			if ( $from_year <= 0 ) {
+				$from_year = (int) current_time( 'Y' );
+			}
+			$to_year = $from_year + 1;
+			$message = isset( $_GET['mfu_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_msg'] ) ) : '';
+			$error = isset( $_GET['mfu_err'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_err'] ) ) : '';
+			$candidates = $this->get_rollover_candidates( $from_year );
+
+			echo '<div class="wrap">';
+			echo '<h1>Rollover de edicion</h1>';
+			echo '<p>Esta herramienta detecta festivales de la edicion ' . esc_html( (string) $from_year ) . ' ya celebrados y los prepara para la edicion ' . esc_html( (string) $to_year ) . '.</p>';
+			echo '<p><strong>Acciones que aplica:</strong> cambia edicion a ' . esc_html( (string) $to_year ) . ', limpia fechas y cartel de la nueva edicion, activa "sin fechas confirmadas", y conserva el contexto anterior en contenido ("Asi fue ' . esc_html( (string) $from_year ) . '").</p>';
+
+			if ( $error !== '' ) {
+				echo '<div class="notice notice-error"><p>' . esc_html( $error ) . '</p></div>';
+			}
+			if ( $message !== '' ) {
+				echo '<div class="notice notice-success"><p>' . esc_html( $message ) . '</p></div>';
+			}
+
+			echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="margin:14px 0;">';
+			echo '<input type="hidden" name="page" value="mfu-rollover" />';
+			echo '<label for="mfu_rollover_from_year"><strong>Edicion origen:</strong></label> ';
+			echo '<input type="number" min="2020" max="2100" id="mfu_rollover_from_year" name="from_year" value="' . esc_attr( (string) $from_year ) . '" style="width:100px;" /> ';
+			echo '<button type="submit" class="button">Refrescar</button>';
+			echo '</form>';
+
+			if ( empty( $candidates ) ) {
+				echo '<p><em>No hay festivales candidatos para rollover en la edicion ' . esc_html( (string) $from_year ) . '.</em></p>';
+				echo '</div>';
+				return;
+			}
+
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			wp_nonce_field( 'mfu_rollover_prepare', '_mfu_nonce' );
+			echo '<input type="hidden" name="action" value="mfu_rollover_prepare" />';
+			echo '<input type="hidden" name="from_year" value="' . esc_attr( (string) $from_year ) . '" />';
+			echo '<input type="hidden" name="to_year" value="' . esc_attr( (string) $to_year ) . '" />';
+
+			echo '<p><label><input type="checkbox" id="mfu_rollover_select_all" checked /> Seleccionar todos (' . (int) count( $candidates ) . ')</label></p>';
+			echo '<table class="widefat striped"><thead><tr>';
+			echo '<th style="width:40px;"></th>';
+			echo '<th>Festival</th>';
+			echo '<th>Edicion</th>';
+			echo '<th>Fecha inicio</th>';
+			echo '<th>Fecha fin</th>';
+			echo '<th>Estado</th>';
+			echo '</tr></thead><tbody>';
+			foreach ( $candidates as $item ) {
+				echo '<tr>';
+				echo '<td><input type="checkbox" class="mfu_rollover_item" name="festival_ids[]" value="' . (int) $item['id'] . '" checked /></td>';
+				echo '<td>';
+				echo '<strong>' . esc_html( $item['title'] ) . '</strong>';
+				if ( ! empty( $item['link'] ) ) {
+					echo '<br /><a href="' . esc_url( $item['link'] ) . '" target="_blank" rel="noopener">Editar ficha</a>';
+				}
+				echo '</td>';
+				echo '<td>' . esc_html( (string) $item['edition'] ) . '</td>';
+				echo '<td>' . esc_html( (string) $item['fecha_inicio'] ) . '</td>';
+				echo '<td>' . esc_html( (string) $item['fecha_fin'] ) . '</td>';
+				echo '<td>' . esc_html( (string) $item['status'] ) . '</td>';
+				echo '</tr>';
+			}
+			echo '</tbody></table>';
+
+			echo '<p style="margin-top:12px;">';
+			echo '<button type="submit" class="button button-primary">Aplicar rollover a seleccionados</button>';
+			echo '</p>';
+			echo '</form>';
+
+			echo "<script>
+			(function(){
+				var all = document.getElementById('mfu_rollover_select_all');
+				var items = document.querySelectorAll('.mfu_rollover_item');
+				if (!all || !items.length) return;
+				all.addEventListener('change', function(){
+					items.forEach(function(i){ i.checked = all.checked; });
+				});
+			})();
+			</script>";
+
+			echo '</div>';
+		}
+
+		private function apply_rollover_to_festival( $festival_id, $from_year, $to_year ) {
+			$festival_id = (int) $festival_id;
+			if ( $festival_id <= 0 ) {
+				return false;
+			}
+			$festival = get_post( $festival_id );
+			if ( ! $festival || $festival->post_type !== 'festi' ) {
+				return false;
+			}
+
+			$old_edition = trim( (string) get_post_meta( $festival_id, 'edicion', true ) );
+			$old_fecha_inicio = trim( (string) get_post_meta( $festival_id, 'fecha_inicio', true ) );
+			$old_fecha_fin = trim( (string) get_post_meta( $festival_id, 'fecha_fin', true ) );
+			$old_artistas = trim( (string) get_post_meta( $festival_id, 'mf_artistas', true ) );
+			$old_cartel = trim( (string) get_post_meta( $festival_id, 'mf_cartel_completo', true ) );
+
+			update_post_meta( $festival_id, 'mfu_prev_edition_label', $from_year > 0 ? (string) $from_year : $old_edition );
+			update_post_meta( $festival_id, 'mfu_prev_fecha_inicio', $old_fecha_inicio );
+			update_post_meta( $festival_id, 'mfu_prev_fecha_fin', $old_fecha_fin );
+			update_post_meta( $festival_id, 'mfu_prev_artistas', $old_artistas );
+			update_post_meta( $festival_id, 'mfu_prev_cartel_completo', $old_cartel );
+			update_post_meta( $festival_id, 'mfu_rollover_at', current_time( 'mysql' ) );
+
+			update_post_meta( $festival_id, 'edicion', (string) $to_year );
+			update_post_meta( $festival_id, 'fecha_inicio', '' );
+			update_post_meta( $festival_id, 'fecha_fin', '' );
+			update_post_meta( $festival_id, 'mf_artistas', '' );
+			update_post_meta( $festival_id, 'mf_cartel_completo', '' );
+			update_post_meta( $festival_id, 'sin_fechas_confirmadas', '1' );
+
+			$content = (string) $festival->post_content;
+			$content = preg_replace( '/<!-- mfu_no_dates_start -->(.*?)<!-- mfu_no_dates_end -->/s', '', $content );
+			$content = trim( (string) $content );
+			$content = $this->apply_no_dates_notice( $festival_id, $content );
+			$content = $this->ensure_min_word_count( $festival_id, $content );
+
+			wp_update_post(
+				array(
+					'ID' => $festival_id,
+					'post_content' => $content,
+				)
+			);
+
+			return true;
+		}
+
+		public function handle_rollover_prepare() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_die( 'No permitido' );
+			}
+			check_admin_referer( 'mfu_rollover_prepare', '_mfu_nonce' );
+
+			$from_year = isset( $_POST['from_year'] ) ? (int) $_POST['from_year'] : (int) current_time( 'Y' );
+			$to_year = isset( $_POST['to_year'] ) ? (int) $_POST['to_year'] : ( $from_year + 1 );
+			$ids = isset( $_POST['festival_ids'] ) ? (array) $_POST['festival_ids'] : array();
+			$ids = array_values( array_unique( array_map( 'intval', $ids ) ) );
+			$ids = array_filter( $ids );
+
+			$back = admin_url( 'admin.php?page=mfu-rollover&from_year=' . $from_year );
+			if ( empty( $ids ) ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'No seleccionaste festivales para el rollover.' ), $back ) );
+				exit;
+			}
+
+			$ok = 0;
+			foreach ( $ids as $festival_id ) {
+				if ( $this->apply_rollover_to_festival( (int) $festival_id, $from_year, $to_year ) ) {
+					$ok++;
+				}
+			}
+
+			wp_safe_redirect( add_query_arg( 'mfu_msg', rawurlencode( 'Rollover aplicado: ' . $ok . ' festivales preparados para ' . $to_year . '.' ), $back ) );
 			exit;
 		}
 
@@ -6991,9 +7229,23 @@ private function test_apify_instagram( $token, $actor_id, $input_value, $max_pos
 			$prev_label = 'edicion anterior';
 		}
 
-		$fecha_inicio = get_post_meta( $festival_id, 'fecha_inicio', true );
-		$fecha_fin = get_post_meta( $festival_id, 'fecha_fin', true );
-		$artistas = get_post_meta( $festival_id, 'mf_artistas', true );
+		$stored_prev_label = trim( (string) get_post_meta( $festival_id, 'mfu_prev_edition_label', true ) );
+		if ( $stored_prev_label !== '' ) {
+			$prev_label = $stored_prev_label;
+		}
+
+		$fecha_inicio = get_post_meta( $festival_id, 'mfu_prev_fecha_inicio', true );
+		if ( $fecha_inicio === '' ) {
+			$fecha_inicio = get_post_meta( $festival_id, 'fecha_inicio', true );
+		}
+		$fecha_fin = get_post_meta( $festival_id, 'mfu_prev_fecha_fin', true );
+		if ( $fecha_fin === '' ) {
+			$fecha_fin = get_post_meta( $festival_id, 'fecha_fin', true );
+		}
+		$artistas = get_post_meta( $festival_id, 'mfu_prev_artistas', true );
+		if ( $artistas === '' ) {
+			$artistas = get_post_meta( $festival_id, 'mf_artistas', true );
+		}
 		$localidad = $this->get_taxonomy_list( $festival_id, 'localidad' );
 		$estilos = $this->get_taxonomy_list( $festival_id, 'estilo_musical' );
 
@@ -7181,6 +7433,7 @@ private function test_apify_instagram( $token, $actor_id, $input_value, $max_pos
 						$after = $this->normalize_date_for_storage( $after );
 					}
 					// fall through
+				case 'edicion':
 				case 'cancelado':
 				case 'mf_artistas':
 				case 'mf_cartel_completo':
