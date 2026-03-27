@@ -2973,6 +2973,8 @@ class MFU_Admin {
 					'Rollover interno de edicion: el festival ya se celebro en ' . $from_year . ' y la ficha pasa a ' . $to_year . '.',
 					'Debe mantener contexto util de la edicion ' . $from_year . ' (fechas y artistas si existen), sin mezclarlo como datos confirmados de ' . $to_year . '.',
 					'No hay fechas/cartel confirmados para ' . $to_year . ' salvo que se indique expresamente en fuentes oficiales.',
+					'Redaccion obligatoria: tono periodistico natural. Prohibido usar frases autorreferenciales como "esta ficha", "es la ficha", "en esta pagina" o similares.',
+					'La apertura debe ser un parrafo informativo y claro, sin plantillas mecanicas.',
 				);
 				if ( ! empty( $old_fields['fecha_inicio'] ) || ! empty( $old_fields['fecha_fin'] ) ) {
 					$evidence_list[] = 'Fechas historicas ' . $from_year . ': ' . (string) ( $old_fields['fecha_inicio'] ?? '' ) . ' - ' . (string) ( $old_fields['fecha_fin'] ?? '' ) . '.';

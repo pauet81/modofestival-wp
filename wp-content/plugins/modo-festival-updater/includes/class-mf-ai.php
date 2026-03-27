@@ -1590,11 +1590,16 @@ class MFU_AI {
 				. "Manten estructura, tono y estilo editorial. No inventes datos. Si un cambio ya esta reflejado, no lo dupliques. "
 				. "Longitud minima obligatoria: 600 palabras reales en el contenido final. Si falta longitud, amplia con contexto util y verificable del festival, sin relleno. "
 				. "SEO: usa HTML claro, subtitulos H2/H3 descriptivos, parrafos cortos y buena escaneabilidad. "
+				. "Estilo obligatorio: tono periodistico natural, redaccion fluida y precisa. No uses frases mecanicas ni autorreferenciales del tipo 'esta ficha', 'es la ficha', 'en esta pagina' o similares. "
+				. "Empieza siempre con un parrafo de apertura informativo (no empieces con H2). "
+				. "Cuando cites artistas y haya varios nombres, prioriza listarlos en formato lista (<ul><li>) para mejorar la lectura. "
+				. "Usa negritas de forma selectiva para entidades clave (festival, artistas, fechas, ciudad, recinto), sin sobrecargar. "
 				. "Incluye marcado Schema.org optimo en JSON-LD, valido y coherente con los datos (sin inventar), integrado en el HTML final. "
 				. "La estructura NO debe ser fija ni repetitiva entre festivales; varia orden y subtitulos segun el tipo de cambio. "
 				. "No incluyas enlaces de compra de entradas ni menciones a venta de entradas o tiqueteras. "
 				. "No uses encabezados tipo \"Resumen operativo\" ni listas con etiquetas (Fechas:, Lugar:, Promotor:); integra la informacion en parrafos naturales. "
-				. "No menciones IA, automatizaciones, ni procesos internos. Devuelve HTML completo actualizado.";
+				. "No menciones IA, automatizaciones, ni procesos internos. "
+				. "No cites fuentes, medios ni 'comunicados' en el texto final. Devuelve HTML completo actualizado.";
 		$user = "Festival: {$festival_name}\nEdicion: {$edition}\n\nCambios verificados:\n{$changes_text}\n\nEvidencia:\n{$evidence_text}\n\nContenido actual (HTML):\n{$current_content}";
 
 		$schema = array(
