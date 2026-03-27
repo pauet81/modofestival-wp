@@ -300,15 +300,21 @@ class MFU_AI {
 						}
 					}
 
-				$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una noticia de otro medio para publicarla como articulo 100% original.\n"
+				$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una noticia (texto ya extraido o pegado) para publicarla como articulo 100% original.\n"
 					. "Reglas:\n"
 					. "- No copies frases ni estructuras literales del texto original.\n"
+					. "- El contenido debe empezar con un parrafo (no empieces con un H2).\n"
 					. "- No incluyas H1 (el H1 lo pone el titulo del post). Usa H2/H3.\n"
 					. "- No incluyas un parrafo de resumen etiquetado como \\\"Resumen\\\".\n"
 					. "- Usa negritas para nombres propios relevantes (artistas, festival, ciudad, recinto, fechas).\n"
 					. "- Evita un tono corporativo (no uses \\\"segun el comunicado\\\", \\\"proximos pasos\\\", etc.).\n"
-					. "- Incluye 1 enlace externo: la URL fuente (puede ir al final como \\\"Fuente\\\" o integrado de forma natural).\n"
-					. "- Si aportas contexto, que sea util y no repetitivo.\n";
+					. "- Nunca menciones ni cites el medio/fuente original. No incluyas enlaces externos.\n"
+					. "- Si se mencionan artistas, intenta incluirlos en un listado (bullets) para facilitar lectura.\n"
+					. "- Incluye exactamente 2 enlaces internos contextuales (sin forzar):\n"
+					. "  - 1 enlace a la agenda.\n"
+					. "  - 1 enlace a un estilo musical relevante de los que te doy.\n"
+					. "- Tono periodistico, natural, sin repeticion.\n"
+					. "- Minimo 600 palabras (objetivo 650-900). Si faltan datos concretos, amplia con contexto evergreen util sin inventar hechos.\n";
 				if ( $internal_hint !== '' ) {
 					$system .= "\n" . $internal_hint . "\n";
 				}
@@ -340,7 +346,7 @@ class MFU_AI {
 				);
 
 				$title_hint = $original_title !== '' ? "TITULAR ORIGINAL (referencia, reescribe sin calcar): {$original_title}\n\n" : '';
-				$user = "URL FUENTE (usa esta como unico enlace externo obligatorio): {$source_url}\n\n"
+				$user = "URL ORIGINAL (solo referencia interna, NO la menciones ni enlaces): {$source_url}\n\n"
 					. $title_hint
 					. "NOTICIA ORIGINAL (texto extraido o pegado):\n\n{$article_text}\n";
 
