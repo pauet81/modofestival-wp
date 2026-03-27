@@ -1612,7 +1612,7 @@ class MFU_Admin {
 
 			echo '<hr />';
 
-			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" enctype="multipart/form-data">';
 			wp_nonce_field( 'mfu_press_release_process', '_mfu_nonce' );
 			echo '<input type="hidden" name="action" value="mfu_press_release_process" />';
 			echo '<table class="form-table"><tbody>';
@@ -1621,6 +1621,12 @@ class MFU_Admin {
 			echo '<th scope="row"><label for="mfu_press_text">Contenido de la nota de prensa</label></th>';
 			echo '<td><textarea id="mfu_press_text" name="press_text" rows="12" style="width:100%;" placeholder="Pega aqui la nota de prensa completa..." required></textarea>';
 			echo '<p class="description">Tip: pega el texto completo, incluyendo fecha y ciudad si aparecen. No hace falta que limpies formatos.</p></td>';
+			echo '</tr>';
+
+			echo '<tr>';
+			echo '<th scope="row"><label for="mfu_press_file">O subir archivo</label></th>';
+			echo '<td><input type="file" id="mfu_press_file" name="press_file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />';
+			echo '<p class="description">Puedes subir un .docx o .pdf. Si el textarea esta vacio, intentaremos extraer el texto automaticamente.</p></td>';
 			echo '</tr>';
 
 			echo '<tr>';
@@ -1724,6 +1730,14 @@ class MFU_Admin {
 			$festival_id = isset( $_POST['festival_id'] ) ? (int) $_POST['festival_id'] : 0;
 
 			$back = admin_url( 'admin.php?page=mfu-press-releases' );
+			if ( $press_text === '' && ! empty( $_FILES['press_file'] ) && is_array( $_FILES['press_file'] ) && ! empty( $_FILES['press_file']['tmp_name'] ) ) {
+				$extracted = $this->extract_press_release_text_from_upload( $_FILES['press_file'] );
+				if ( is_wp_error( $extracted ) ) {
+					wp_redirect( add_query_arg( 'mfu_err', rawurlencode( $extracted->get_error_message() ), $back ) );
+					exit;
+				}
+				$press_text = trim( (string) $extracted );
+			}
 			if ( $press_text === '' ) {
 				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'La nota de prensa esta vacia.' ), $back ) );
 				exit;
@@ -1866,7 +1880,8 @@ class MFU_Admin {
 				$internal_links = array(
 					'agenda' => home_url( '/agenda-festivales/' ),
 				);
-				$draft = $ai->rewrite_press_release_to_post( $press_text, $internal_links, $original_title );
+				$style_catalog = $this->get_style_catalog_links();
+				$draft = $ai->rewrite_press_release_to_post( $press_text, $internal_links, $original_title, $style_catalog );
 			if ( is_wp_error( $draft ) ) {
 				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( $draft->get_error_message() ), $back ) );
 				exit;
@@ -1948,6 +1963,74 @@ class MFU_Admin {
 
 			wp_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Borrador creado.' ), 'post_id' => $post_id ), $back ) );
 			exit;
+		}
+
+		private function extract_press_release_text_from_upload( $file ) {
+			if ( ! is_array( $file ) ) {
+				return new WP_Error( 'mfu_press_file', 'Archivo invalido.' );
+			}
+			if ( empty( $file['tmp_name'] ) || ! is_string( $file['tmp_name'] ) ) {
+				return new WP_Error( 'mfu_press_file', 'Archivo invalido (tmp).' );
+			}
+			if ( ! empty( $file['error'] ) ) {
+				return new WP_Error( 'mfu_press_file', 'Error al subir el archivo.' );
+			}
+			$tmp = $file['tmp_name'];
+			$name = isset( $file['name'] ) ? (string) $file['name'] : '';
+			$ext = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
+
+			if ( ! in_array( $ext, array( 'pdf', 'docx' ), true ) ) {
+				return new WP_Error( 'mfu_press_file', 'Formato no soportado. Sube un .docx o .pdf.' );
+			}
+
+			if ( $ext === 'docx' ) {
+				if ( ! class_exists( 'ZipArchive' ) ) {
+					return new WP_Error( 'mfu_press_file', 'No se puede leer .docx (ZipArchive no disponible).' );
+				}
+				$zip = new ZipArchive();
+				$opened = $zip->open( $tmp );
+				if ( $opened !== true ) {
+					return new WP_Error( 'mfu_press_file', 'No se pudo abrir el .docx.' );
+				}
+				$xml = $zip->getFromName( 'word/document.xml' );
+				$zip->close();
+				if ( ! is_string( $xml ) || $xml === '' ) {
+					return new WP_Error( 'mfu_press_file', 'No se pudo extraer texto del .docx.' );
+				}
+				$text = wp_strip_all_tags( $xml );
+				$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5 );
+				$text = preg_replace( '/\\s+/', ' ', $text );
+				$text = trim( (string) $text );
+				if ( strlen( $text ) < 200 ) {
+					return new WP_Error( 'mfu_press_file', 'El .docx no contiene texto suficiente.' );
+				}
+				if ( strlen( $text ) > 50000 ) {
+					$text = substr( $text, 0, 50000 );
+				}
+				return $text;
+			}
+
+			// PDF: best-effort via pdftotext if available on server.
+			if ( ! function_exists( 'shell_exec' ) ) {
+				return new WP_Error( 'mfu_press_file', 'No se puede extraer texto del PDF en este servidor. Pega el texto manualmente.' );
+			}
+			$bin = @shell_exec( 'command -v pdftotext 2>/dev/null' );
+			$bin = is_string( $bin ) ? trim( $bin ) : '';
+			if ( $bin === '' ) {
+				return new WP_Error( 'mfu_press_file', 'No se puede extraer texto del PDF (pdftotext no disponible). Pega el texto manualmente.' );
+			}
+			$cmd = escapeshellcmd( $bin ) . ' -q ' . escapeshellarg( $tmp ) . ' -';
+			$out = @shell_exec( $cmd );
+			$out = is_string( $out ) ? trim( $out ) : '';
+			$out = preg_replace( '/\\s+/', ' ', $out );
+			$out = trim( (string) $out );
+			if ( strlen( $out ) < 200 ) {
+				return new WP_Error( 'mfu_press_file', 'No se pudo extraer texto suficiente del PDF. Pega el texto manualmente.' );
+			}
+			if ( strlen( $out ) > 50000 ) {
+				$out = substr( $out, 0, 50000 );
+			}
+			return $out;
 		}
 
 		private function get_external_news_transient_key() {

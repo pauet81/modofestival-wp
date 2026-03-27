@@ -451,15 +451,15 @@ class MFU_AI {
 				return $decoded;
 			}
 
-			public function rewrite_press_release_to_post( $press_text, $internal_links = array(), $original_title = '' ) {
+			public function rewrite_press_release_to_post( $press_text, $internal_links = array(), $original_title = '', $style_catalog = array() ) {
 				$press_text = is_string( $press_text ) ? trim( $press_text ) : '';
 				if ( $press_text === '' ) {
 					return new WP_Error( 'mfu_press_empty', 'Press release text is empty' );
-			}
-			$original_title = is_string( $original_title ) ? trim( $original_title ) : '';
+				}
+				$original_title = is_string( $original_title ) ? trim( $original_title ) : '';
 
-			$links_hint = '';
-			if ( is_array( $internal_links ) && ! empty( $internal_links ) ) {
+				$links_hint = '';
+				if ( is_array( $internal_links ) && ! empty( $internal_links ) ) {
 				$lines = array();
 				foreach ( $internal_links as $label => $url ) {
 					$label = trim( (string) $label );
@@ -468,26 +468,50 @@ class MFU_AI {
 						$lines[] = "- {$label}: {$url}";
 					}
 				}
-				if ( ! empty( $lines ) ) {
-					$links_hint = "Enlaces internos permitidos (usa solo si encaja, sin forzar):\n" . implode( "\n", $lines );
+					if ( ! empty( $lines ) ) {
+						$links_hint = "Enlaces internos permitidos (usa solo si encaja, sin forzar):\n" . implode( "\n", $lines );
+					}
 				}
-			}
 
-			$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una nota de prensa para publicarla como articulo 100% original.\n"
+				$style_links_hint = '';
+				if ( is_array( $style_catalog ) && ! empty( $style_catalog ) ) {
+					$lines = array();
+					foreach ( $style_catalog as $slug => $url ) {
+						$slug = sanitize_title( (string) $slug );
+						$url = trim( (string) $url );
+						if ( $slug !== '' && $url !== '' ) {
+							$lines[] = "- {$slug}: {$url}";
+						}
+					}
+					if ( ! empty( $lines ) ) {
+						$style_links_hint = "Enlaces internos de estilos (si encaja, enlaza a 1 estilo con su URL real):\n" . implode( "\n", $lines );
+					}
+				}
+
+				$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una nota de prensa para publicarla como articulo 100% original.\n"
 				. "Reglas:\n"
 				. "- No copies frases ni estructuras literales del texto original.\n"
 				. "- Mantén el titular muy cercano al original (cambia solo lo imprescindible para hacerlo unico).\n"
+				. "- El contenido debe empezar con un parrafo (no empieces con un H2).\n"
 				. "- No incluyas H1 (el H1 lo pone el titulo del post). Usa H2/H3.\n"
 				. "- No incluyas un parrafo de resumen etiquetado como \"Resumen\".\n"
 				. "- Usa negritas para nombres propios relevantes (artistas, festival, ciudad, recinto, fechas).\n"
 				. "- Evita un tono corporativo; escribe con tono periodistico.\n"
-				. "- No incluyas enlaces externos.\n"
+				. "- Nunca menciones ni cites que es una nota de prensa. No incluyas enlaces externos.\n"
+				. "- Si se mencionan artistas, intenta incluirlos en un listado (bullets) para facilitar lectura.\n"
+				. "- Incluye exactamente 2 enlaces internos contextuales (sin forzar):\n"
+				. "  - 1 enlace a la agenda.\n"
+				. "  - 1 enlace a un estilo musical relevante de los que te doy.\n"
+				. "- Minimo 600 palabras (objetivo 650-900). Si faltan datos concretos, amplia con contexto evergreen util sin inventar hechos.\n"
 				. "- Si aportas contexto, que sea util y no repetitivo.\n";
-			if ( $links_hint !== '' ) {
-				$system .= "\n" . $links_hint . "\n";
-			}
-			$system .= "\nEstilos musicales permitidos (slugs): country, dance, electronica, experimental, flamenco, folk, funk, indie, jazz, metal, pop, punk, reggaeton, rock, techno, urbana.\n"
-				. "Devuelve 1-3 estilos relevantes en style_slugs.\n";
+				if ( $links_hint !== '' ) {
+					$system .= "\n" . $links_hint . "\n";
+				}
+				if ( $style_links_hint !== '' ) {
+					$system .= "\n" . $style_links_hint . "\n";
+				}
+				$system .= "\nEstilos musicales permitidos (slugs): country, dance, electronica, experimental, flamenco, folk, funk, indie, jazz, metal, pop, punk, reggaeton, rock, techno, urbana.\n"
+					. "Devuelve 1-3 estilos relevantes en style_slugs.\n";
 
 			$schema = array(
 				'name' => 'mfu_press_release_post',
