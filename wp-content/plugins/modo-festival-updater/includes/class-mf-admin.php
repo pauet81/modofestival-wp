@@ -2913,6 +2913,15 @@ class MFU_Admin {
 				)
 			);
 
+			$yoast_title = $this->build_rollover_yoast_title( $festival_id, (string) $festival->post_title, (int) $to_year );
+			$yoast_desc = $this->build_rollover_yoast_description( $festival_id, (string) $festival->post_title, (int) $from_year, (int) $to_year );
+			if ( $yoast_title !== '' ) {
+				update_post_meta( $festival_id, '_yoast_wpseo_title', $yoast_title );
+			}
+			if ( $yoast_desc !== '' ) {
+				update_post_meta( $festival_id, '_yoast_wpseo_metadesc', $yoast_desc );
+			}
+
 			wp_update_post(
 				array(
 					'ID' => $festival_id,
@@ -3049,6 +3058,41 @@ class MFU_Admin {
 			$html .= '<p>Si estas planificando asistencia para la siguiente edicion, lo mas razonable es seguir los canales oficiales del evento y revisar periodicamente esta pagina. ';
 			$html .= 'Nuestro criterio editorial en esta fase es no adelantar informacion no confirmada: cuando haya anuncio oficial de fechas o cartel, lo integraremos en la ficha con prioridad.</p>';
 			return $html;
+		}
+
+		private function build_rollover_yoast_title( $festival_id, $title, $to_year ) {
+			$title = trim( (string) $title );
+			$to_year = (int) $to_year;
+			$localidad = $this->get_taxonomy_list( $festival_id, 'localidad' );
+			$base = $title . ' ' . $to_year;
+			if ( $localidad !== '' ) {
+				$base .= ' en ' . $localidad;
+			}
+			$meta_title = $base . ' | Fechas, cartel y entradas';
+			if ( function_exists( 'mb_substr' ) ) {
+				$meta_title = mb_substr( $meta_title, 0, 60 );
+			} else {
+				$meta_title = substr( $meta_title, 0, 60 );
+			}
+			return trim( $meta_title );
+		}
+
+		private function build_rollover_yoast_description( $festival_id, $title, $from_year, $to_year ) {
+			$title = trim( (string) $title );
+			$from_year = (int) $from_year;
+			$to_year = (int) $to_year;
+			$localidad = $this->get_taxonomy_list( $festival_id, 'localidad' );
+			$desc = 'Consulta la ficha de ' . $title . ' ' . $to_year . ': estado de fechas, cartel y novedades. ';
+			if ( $localidad !== '' ) {
+				$desc .= 'Festival en ' . $localidad . '. ';
+			}
+			$desc .= 'Incluye contexto de la edicion ' . $from_year . ' y actualizaciones oficiales en cuanto se publiquen.';
+			if ( function_exists( 'mb_substr' ) ) {
+				$desc = mb_substr( $desc, 0, 155 );
+			} else {
+				$desc = substr( $desc, 0, 155 );
+			}
+			return trim( $desc );
 		}
 
 		public function handle_rollover_prepare() {
