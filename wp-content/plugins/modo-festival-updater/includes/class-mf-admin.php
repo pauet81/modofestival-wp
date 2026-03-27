@@ -2882,6 +2882,7 @@ class MFU_Admin {
 			$old_fecha_fin = trim( (string) get_post_meta( $festival_id, 'fecha_fin', true ) );
 			$old_artistas = trim( (string) get_post_meta( $festival_id, 'mf_artistas', true ) );
 			$old_cartel = trim( (string) get_post_meta( $festival_id, 'mf_cartel_completo', true ) );
+			$old_content = (string) $festival->post_content;
 
 			update_post_meta( $festival_id, 'mfu_prev_edition_label', $from_year > 0 ? (string) $from_year : $old_edition );
 			update_post_meta( $festival_id, 'mfu_prev_fecha_inicio', $old_fecha_inicio );
@@ -2897,11 +2898,20 @@ class MFU_Admin {
 			update_post_meta( $festival_id, 'mf_cartel_completo', '' );
 			update_post_meta( $festival_id, 'sin_fechas_confirmadas', '1' );
 
-			$content = (string) $festival->post_content;
-			$content = preg_replace( '/<!-- mfu_no_dates_start -->(.*?)<!-- mfu_no_dates_end -->/s', '', $content );
-			$content = trim( (string) $content );
-			$content = $this->apply_no_dates_notice( $festival_id, $content );
-			$content = $this->ensure_min_word_count( $festival_id, $content );
+			$content = $this->rewrite_rollover_content(
+				$festival_id,
+				$festival,
+				$from_year,
+				$to_year,
+				$old_content,
+				array(
+					'edicion' => $old_edition,
+					'fecha_inicio' => $old_fecha_inicio,
+					'fecha_fin' => $old_fecha_fin,
+					'mf_artistas' => $old_artistas,
+					'mf_cartel_completo' => $old_cartel,
+				)
+			);
 
 			wp_update_post(
 				array(
@@ -2911,6 +2921,134 @@ class MFU_Admin {
 			);
 
 			return true;
+		}
+
+		private function rewrite_rollover_content( $festival_id, $festival, $from_year, $to_year, $old_content, $old_fields ) {
+			$festival_id = (int) $festival_id;
+			$title = is_object( $festival ) ? (string) $festival->post_title : '';
+			$from_year = (int) $from_year;
+			$to_year = (int) $to_year;
+			$old_content = preg_replace( '/<!-- mfu_no_dates_start -->(.*?)<!-- mfu_no_dates_end -->/s', '', (string) $old_content );
+			$old_content = trim( (string) $old_content );
+			$old_fields = is_array( $old_fields ) ? $old_fields : array();
+
+			$ai = new MFU_AI();
+			if ( $ai->has_key() ) {
+				$diffs = array(
+					'edicion' => array(
+						'before' => (string) ( $old_fields['edicion'] ?? '' ),
+						'after' => (string) $to_year,
+					),
+					'fecha_inicio' => array(
+						'before' => (string) ( $old_fields['fecha_inicio'] ?? '' ),
+						'after' => '',
+					),
+					'fecha_fin' => array(
+						'before' => (string) ( $old_fields['fecha_fin'] ?? '' ),
+						'after' => '',
+					),
+					'mf_artistas' => array(
+						'before' => (string) ( $old_fields['mf_artistas'] ?? '' ),
+						'after' => '',
+					),
+					'mf_cartel_completo' => array(
+						'before' => (string) ( $old_fields['mf_cartel_completo'] ?? '' ),
+						'after' => '',
+					),
+					'sin_fechas_confirmadas' => array(
+						'before' => '0',
+						'after' => '1',
+					),
+				);
+				$evidence_list = array(
+					'Rollover interno de edicion: el festival ya se celebro en ' . $from_year . ' y la ficha pasa a ' . $to_year . '.',
+					'Debe mantener contexto util de la edicion ' . $from_year . ' (fechas y artistas si existen), sin mezclarlo como datos confirmados de ' . $to_year . '.',
+					'No hay fechas/cartel confirmados para ' . $to_year . ' salvo que se indique expresamente en fuentes oficiales.',
+				);
+				if ( ! empty( $old_fields['fecha_inicio'] ) || ! empty( $old_fields['fecha_fin'] ) ) {
+					$evidence_list[] = 'Fechas historicas ' . $from_year . ': ' . (string) ( $old_fields['fecha_inicio'] ?? '' ) . ' - ' . (string) ( $old_fields['fecha_fin'] ?? '' ) . '.';
+				}
+				if ( ! empty( $old_fields['mf_artistas'] ) ) {
+					$evidence_list[] = 'Artistas historicos ' . $from_year . ': ' . (string) $old_fields['mf_artistas'] . '.';
+				}
+
+				$ai_content = $ai->rewrite_festival_content(
+					$title,
+					(string) $to_year,
+					$old_content,
+					$diffs,
+					$evidence_list
+				);
+				if ( ! is_wp_error( $ai_content ) ) {
+					$ai_content = $this->sanitize_ai_content( (string) $ai_content );
+					$ai_content = $this->strip_ticket_links( $ai_content );
+					$ai_content = $this->strip_ticket_mentions( $ai_content );
+					$ai_content = trim( (string) $ai_content );
+					if ( $ai_content !== '' ) {
+						return $this->ensure_min_word_count( $festival_id, $ai_content );
+					}
+				}
+			}
+
+			$fallback = $this->build_rollover_fallback_content( $festival_id, $title, $from_year, $to_year, $old_fields );
+			return $this->ensure_min_word_count( $festival_id, $fallback );
+		}
+
+		private function build_rollover_fallback_content( $festival_id, $title, $from_year, $to_year, $old_fields ) {
+			$title = trim( (string) $title );
+			$from_year = (int) $from_year;
+			$to_year = (int) $to_year;
+			$old_fields = is_array( $old_fields ) ? $old_fields : array();
+			$fecha_inicio = $this->format_date_value( (string) ( $old_fields['fecha_inicio'] ?? '' ) );
+			$fecha_fin = $this->format_date_value( (string) ( $old_fields['fecha_fin'] ?? '' ) );
+			$artistas = trim( (string) ( $old_fields['mf_artistas'] ?? '' ) );
+			$localidad = $this->get_taxonomy_list( $festival_id, 'localidad' );
+			$estilos = $this->get_taxonomy_list( $festival_id, 'estilo_musical' );
+
+			$html  = '<p><strong>' . esc_html( $title ) . ' ' . esc_html( (string) $to_year ) . '</strong> entra en fase de seguimiento para la nueva edicion. ';
+			$html .= 'Por ahora no hay una programacion oficial cerrada para ' . esc_html( (string) $to_year ) . ', asi que esta ficha queda preparada para integrar fechas, cartel y novedades en cuanto se publiquen.</p>';
+			$html .= '<h2>Edicion ' . esc_html( (string) $to_year ) . ': estado actual</h2>';
+			$html .= '<p>La organizacion todavia no ha confirmado de forma oficial ni el calendario completo ni el cartel final de la edicion ' . esc_html( (string) $to_year ) . '. ';
+			$html .= 'Durante esta fase de transicion, el objetivo de la ficha es separar con claridad la informacion historica de la informacion nueva para evitar confusiones.</p>';
+			$html .= '<p>En cuanto haya comunicacion oficial sobre preventa, anuncio de fechas o primeras confirmaciones artisticas, actualizaremos este contenido y los campos estructurados de la ficha para reflejar la edicion ' . esc_html( (string) $to_year ) . ' de forma precisa.</p>';
+			$html .= '<h2>Asi fue ' . esc_html( (string) $from_year ) . '</h2>';
+			if ( $fecha_inicio !== '' || $fecha_fin !== '' ) {
+				$html .= '<p>La edicion ' . esc_html( (string) $from_year ) . ' se desarrollo ';
+				if ( $fecha_inicio !== '' && $fecha_fin !== '' ) {
+					$html .= 'entre el <strong>' . esc_html( $fecha_inicio ) . '</strong> y el <strong>' . esc_html( $fecha_fin ) . '</strong>.';
+				} elseif ( $fecha_inicio !== '' ) {
+					$html .= 'a partir del <strong>' . esc_html( $fecha_inicio ) . '</strong>.';
+				} else {
+					$html .= 'con fecha de cierre el <strong>' . esc_html( $fecha_fin ) . '</strong>.';
+				}
+				$html .= '</p>';
+			} else {
+				$html .= '<p>No disponemos de fechas historicas cerradas para documentar con detalle la edicion ' . esc_html( (string) $from_year ) . ' en este momento.</p>';
+			}
+
+			if ( $artistas !== '' ) {
+				$list = array_filter( array_map( 'trim', preg_split( '/[,;]+/', $artistas ) ) );
+				if ( ! empty( $list ) ) {
+					$html .= '<h3>Artistas destacados en ' . esc_html( (string) $from_year ) . '</h3><ul>';
+					foreach ( array_slice( $list, 0, 24 ) as $artist ) {
+						$html .= '<li><strong>' . esc_html( $artist ) . '</strong></li>';
+					}
+					$html .= '</ul>';
+				}
+			}
+
+			$html .= '<h2>Contexto del festival y previsiones para ' . esc_html( (string) $to_year ) . '</h2>';
+			$html .= '<p>';
+			if ( $localidad !== '' ) {
+				$html .= '<strong>' . esc_html( $title ) . '</strong> mantiene su vinculacion con <strong>' . esc_html( $localidad ) . '</strong>. ';
+			}
+			if ( $estilos !== '' ) {
+				$html .= 'En terminos artistico-editoriales, el festival se mueve en torno a <strong>' . esc_html( $estilos ) . '</strong>, una linea que suele marcar el tipo de cartel y de publico. ';
+			}
+			$html .= 'Hasta que se confirmen datos concretos de ' . esc_html( (string) $to_year ) . ', esta ficha se ira actualizando por bloques para conservar una lectura clara y util.</p>';
+			$html .= '<p>Si estas planificando asistencia para la siguiente edicion, lo mas razonable es seguir los canales oficiales del evento y revisar periodicamente esta pagina. ';
+			$html .= 'Nuestro criterio editorial en esta fase es no adelantar informacion no confirmada: cuando haya anuncio oficial de fechas o cartel, lo integraremos en la ficha con prioridad.</p>';
+			return $html;
 		}
 
 		public function handle_rollover_prepare() {
