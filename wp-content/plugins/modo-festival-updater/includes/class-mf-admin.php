@@ -2993,7 +2993,7 @@ class MFU_Admin {
 					$ai_content = $this->strip_ticket_links( $ai_content );
 					$ai_content = $this->strip_ticket_mentions( $ai_content );
 					$ai_content = trim( (string) $ai_content );
-					if ( $ai_content !== '' ) {
+					if ( $ai_content !== '' && ! $this->has_rollover_content_red_flags( $ai_content ) ) {
 						return $this->ensure_min_word_count( $festival_id, $ai_content );
 					}
 				}
@@ -3001,6 +3001,23 @@ class MFU_Admin {
 
 			$fallback = $this->build_rollover_fallback_content( $festival_id, $title, $from_year, $to_year, $old_fields );
 			return $this->ensure_min_word_count( $festival_id, $fallback );
+		}
+
+		private function has_rollover_content_red_flags( $content ) {
+			$content = strtolower( wp_strip_all_tags( (string) $content ) );
+			$red_flags = array(
+				'es la ficha de la proxima edicion',
+				'es la ficha de la próxima edición',
+				'esta ficha es la ficha',
+				'la ficha de la proxima edicion del',
+				'la ficha de la próxima edición del',
+			);
+			foreach ( $red_flags as $flag ) {
+				if ( strpos( $content, $flag ) !== false ) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		private function build_rollover_fallback_content( $festival_id, $title, $from_year, $to_year, $old_fields ) {
