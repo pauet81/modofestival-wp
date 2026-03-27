@@ -119,18 +119,22 @@ class MFU_AI {
 		return $text;
 	}
 
-		private function select_provider( $action ) {
-			$action = (string) $action;
-			$write_actions = array(
-				'write_news',
-				'rewrite_content',
-				'rewrite_content_answer',
-				'rewrite_content_seo',
-				'prefill_localidad_fechas',
-				'verify_update',
-				'verify_update_web_search',
-				'verify_content_strict',
-				'compare_sources',
+			private function select_provider( $action ) {
+				$action = (string) $action;
+					$write_actions = array(
+						'write_news',
+						'rewrite_content',
+						'rewrite_content_answer',
+						'rewrite_content_seo',
+						'rewrite_press_release',
+						'rewrite_external_news',
+						'press_release_festival_update',
+						'external_news_festival_update',
+						'prefill_localidad_fechas',
+						'verify_update',
+						'verify_update_web_search',
+						'verify_content_strict',
+						'compare_sources',
 			'generate_headlines',
 			'generate_headlines_by_change',
 			'identify_festival',
@@ -220,44 +224,395 @@ class MFU_AI {
 		return $normalized;
 	}
 
-	private function decode_json_from_text( $text ) {
-		if ( ! is_string( $text ) ) {
-			return null;
-		}
+			private function decode_json_from_text( $text ) {
+				if ( ! is_string( $text ) ) {
+					return null;
+				}
 
-		$trimmed = trim( $text );
-		if ( $trimmed === '' ) {
-			return null;
-		}
+			$trimmed = trim( $text );
+			if ( $trimmed === '' ) {
+				return null;
+			}
 
-		$decoded = json_decode( $trimmed, true );
-		if ( is_array( $decoded ) ) {
+			$decoded = json_decode( $trimmed, true );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+
+			if ( preg_match( '/```(?:json)?\\s*(\\{.*\\})\\s*```/s', $trimmed, $matches ) ) {
+				$decoded = json_decode( $matches[1], true );
+				if ( is_array( $decoded ) ) {
+					return $decoded;
+				}
+			}
+
+			$start = strpos( $trimmed, '{' );
+			$end = strrpos( $trimmed, '}' );
+			if ( $start !== false && $end !== false && $end > $start ) {
+				$candidate = substr( $trimmed, $start, $end - $start + 1 );
+				$decoded = json_decode( $candidate, true );
+				if ( is_array( $decoded ) ) {
+					return $decoded;
+				}
+			}
+
+				return null;
+			}
+
+			public function rewrite_external_news_to_post( $source_url, $article_text, $style_catalog = array(), $internal_links = array(), $original_title = '' ) {
+				$source_url = trim( (string) $source_url );
+				$article_text = is_string( $article_text ) ? trim( $article_text ) : '';
+				$original_title = is_string( $original_title ) ? trim( $original_title ) : '';
+
+				if ( $source_url === '' || $article_text === '' ) {
+					return new WP_Error( 'mfu_external_news_missing', 'Source URL or article text missing' );
+				}
+
+				$internal_hint = '';
+				if ( is_array( $internal_links ) && ! empty( $internal_links ) ) {
+					$lines = array();
+					foreach ( $internal_links as $label => $url ) {
+						$label = trim( (string) $label );
+						$url = trim( (string) $url );
+						if ( $label !== '' && $url !== '' ) {
+							$lines[] = "- {$label}: {$url}";
+						}
+					}
+						if ( ! empty( $lines ) ) {
+							$internal_hint = "Enlaces internos permitidos (usa 1-3 si encaja, sin forzar):\n" . implode( "\n", $lines );
+						}
+					}
+
+				$styles_hint = "Estilos musicales permitidos (slugs): country, dance, electronica, experimental, flamenco, folk, funk, indie, indiea, jazz, metal, pop, punk, reggaeton, rock, techno, urbana.\n"
+					. "Devuelve 1-3 estilos relevantes en style_slugs.\n";
+				$style_links_hint = '';
+				if ( is_array( $style_catalog ) && ! empty( $style_catalog ) ) {
+					$lines = array();
+					foreach ( $style_catalog as $slug => $url ) {
+						$slug = sanitize_title( (string) $slug );
+						$url = trim( (string) $url );
+						if ( $slug !== '' && $url !== '' ) {
+							$lines[] = "- {$slug}: {$url}";
+						}
+					}
+						if ( ! empty( $lines ) ) {
+							$style_links_hint = "Enlaces internos de estilos (si encaja, enlaza a 1 estilo con su URL real):\n" . implode( "\n", $lines );
+						}
+					}
+
+				$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una noticia de otro medio para publicarla como articulo 100% original.\n"
+					. "Reglas:\n"
+					. "- No copies frases ni estructuras literales del texto original.\n"
+					. "- No incluyas H1 (el H1 lo pone el titulo del post). Usa H2/H3.\n"
+					. "- No incluyas un parrafo de resumen etiquetado como \\\"Resumen\\\".\n"
+					. "- Usa negritas para nombres propios relevantes (artistas, festival, ciudad, recinto, fechas).\n"
+					. "- Evita un tono corporativo (no uses \\\"segun el comunicado\\\", \\\"proximos pasos\\\", etc.).\n"
+					. "- Incluye 1 enlace externo: la URL fuente (puede ir al final como \\\"Fuente\\\" o integrado de forma natural).\n"
+					. "- Si aportas contexto, que sea util y no repetitivo.\n";
+				if ( $internal_hint !== '' ) {
+					$system .= "\n" . $internal_hint . "\n";
+				}
+				if ( $style_links_hint !== '' ) {
+					$system .= "\n" . $style_links_hint . "\n";
+				}
+				$system .= "\n" . $styles_hint;
+
+				$schema = array(
+					'name' => 'mfu_external_news_post',
+					'schema' => array(
+						'type' => 'object',
+						'additionalProperties' => false,
+						'required' => array( 'title', 'slug', 'excerpt', 'content_html', 'yoast_title', 'yoast_metadesc', 'focus_keyphrase', 'style_slugs' ),
+						'properties' => array(
+							'title' => array( 'type' => 'string' ),
+							'slug' => array( 'type' => 'string' ),
+							'excerpt' => array( 'type' => 'string' ),
+							'content_html' => array( 'type' => 'string' ),
+							'yoast_title' => array( 'type' => 'string' ),
+							'yoast_metadesc' => array( 'type' => 'string' ),
+							'focus_keyphrase' => array( 'type' => 'string' ),
+							'style_slugs' => array(
+								'type' => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+						),
+					),
+				);
+
+				$title_hint = $original_title !== '' ? "TITULAR ORIGINAL (referencia, reescribe sin calcar): {$original_title}\n\n" : '';
+				$user = "URL FUENTE (usa esta como unico enlace externo obligatorio): {$source_url}\n\n"
+					. $title_hint
+					. "NOTICIA ORIGINAL (texto extraido o pegado):\n\n{$article_text}\n";
+
+				$messages = array(
+					array( 'role' => 'system', 'content' => array( array( 'type' => 'text', 'text' => $system ) ) ),
+					array( 'role' => 'user', 'content' => array( array( 'type' => 'text', 'text' => $user ) ) ),
+				);
+
+				$text = $this->request( $this->model_write, $messages, $schema, 0.2, null, 'rewrite_external_news' );
+				if ( is_wp_error( $text ) ) {
+					return $text;
+				}
+
+				$decoded = $this->decode_json_from_text( $text );
+				if ( ! is_array( $decoded ) ) {
+					return new WP_Error( 'mfu_external_news_bad_json', 'Invalid JSON from AI' );
+				}
+				return $decoded;
+			}
+
+			public function external_news_festival_update_payload( $festival_name, $edition, $current_content, $current_fields, $source_url, $article_text ) {
+				$festival_name = trim( (string) $festival_name );
+				$edition = trim( (string) $edition );
+				$current_content = is_string( $current_content ) ? $current_content : '';
+				$current_fields = is_array( $current_fields ) ? $current_fields : array();
+				$source_url = trim( (string) $source_url );
+				$article_text = is_string( $article_text ) ? trim( $article_text ) : '';
+
+				if ( $festival_name === '' || $source_url === '' || $article_text === '' ) {
+					return new WP_Error( 'mfu_external_news_missing', 'Festival name, source URL or article text missing' );
+				}
+
+				$system = "Eres un editor de fichas de festival. A partir de una noticia externa (normalmente veraz), propone actualizaciones para la ficha del festival.\n"
+					. "Reglas:\n"
+					. "- No inventes datos. Si un dato no aparece claramente en el texto, devuelve null para ese campo.\n"
+					. "- No incluyas H1 en el contenido (usa H2/H3).\n"
+					. "- Nombres de artistas en negrita.\n"
+					. "- Evita frases tipo \"segun el comunicado\" o metacomentarios sobre versiones previas.\n"
+					. "- Fechas: devuelve fecha_inicio/fecha_fin en formato YYYYMMDD.\n"
+					. "- mf_artistas: devuelve una lista en una sola linea separada por comas.\n";
+
+				$schema = array(
+					'name' => 'mfu_external_news_festival_update',
+					'schema' => array(
+						'type' => 'object',
+						'additionalProperties' => false,
+						'required' => array( 'summary', 'fields', 'updated_content_html' ),
+						'properties' => array(
+							'summary' => array( 'type' => 'string' ),
+							'fields' => array(
+								'type' => 'object',
+								'additionalProperties' => false,
+								'required' => array(
+									'fecha_inicio',
+									'fecha_fin',
+									'mf_artistas',
+									'mf_web_oficial',
+									'mf_instagram',
+									'mf_cartel_completo',
+									'cancelado',
+									'sin_fechas_confirmadas',
+								),
+								'properties' => array(
+									'fecha_inicio' => array( 'type' => array( 'string', 'null' ) ),
+									'fecha_fin' => array( 'type' => array( 'string', 'null' ) ),
+									'mf_artistas' => array( 'type' => array( 'string', 'null' ) ),
+									'mf_web_oficial' => array( 'type' => array( 'string', 'null' ) ),
+									'mf_instagram' => array( 'type' => array( 'string', 'null' ) ),
+									'mf_cartel_completo' => array( 'type' => array( 'string', 'null' ) ),
+									'cancelado' => array( 'type' => array( 'string', 'null' ) ),
+									'sin_fechas_confirmadas' => array( 'type' => array( 'string', 'null' ) ),
+								),
+							),
+							'updated_content_html' => array( 'type' => 'string' ),
+						),
+					),
+				);
+
+				$current_fields_lines = array();
+				foreach ( $current_fields as $k => $v ) {
+					if ( is_scalar( $v ) ) {
+						$current_fields_lines[] = $k . ': ' . (string) $v;
+					}
+				}
+				$current_fields_text = implode( "\n", $current_fields_lines );
+				$edition_note = $edition !== '' ? "Edicion objetivo: {$edition}." : '';
+				$user = "FESTIVAL: {$festival_name}\n{$edition_note}\n\nFUENTE: {$source_url}\n\nCAMPOS ACTUALES (referencia):\n{$current_fields_text}\n\nCONTENIDO ACTUAL (HTML):\n{$current_content}\n\nNOTICIA EXTERNA (texto):\n{$article_text}";
+
+				$messages = array(
+					array( 'role' => 'system', 'content' => array( array( 'type' => 'text', 'text' => $system ) ) ),
+					array( 'role' => 'user', 'content' => array( array( 'type' => 'text', 'text' => $user ) ) ),
+				);
+
+				$text = $this->request( $this->model_write, $messages, $schema, 0.2, null, 'external_news_festival_update' );
+				if ( is_wp_error( $text ) ) {
+					return $text;
+				}
+				$decoded = $this->decode_json_from_text( $text );
+				if ( ! is_array( $decoded ) ) {
+					return new WP_Error( 'mfu_external_news_festi_bad_json', 'Invalid JSON from AI' );
+				}
+				return $decoded;
+			}
+
+			public function rewrite_press_release_to_post( $press_text, $internal_links = array(), $original_title = '' ) {
+				$press_text = is_string( $press_text ) ? trim( $press_text ) : '';
+				if ( $press_text === '' ) {
+					return new WP_Error( 'mfu_press_empty', 'Press release text is empty' );
+			}
+			$original_title = is_string( $original_title ) ? trim( $original_title ) : '';
+
+			$links_hint = '';
+			if ( is_array( $internal_links ) && ! empty( $internal_links ) ) {
+				$lines = array();
+				foreach ( $internal_links as $label => $url ) {
+					$label = trim( (string) $label );
+					$url = trim( (string) $url );
+					if ( $label !== '' && $url !== '' ) {
+						$lines[] = "- {$label}: {$url}";
+					}
+				}
+				if ( ! empty( $lines ) ) {
+					$links_hint = "Enlaces internos permitidos (usa solo si encaja, sin forzar):\n" . implode( "\n", $lines );
+				}
+			}
+
+			$system = "Eres un redactor SEO para un medio musical. Tu tarea es reescribir una nota de prensa para publicarla como articulo 100% original.\n"
+				. "Reglas:\n"
+				. "- No copies frases ni estructuras literales del texto original.\n"
+				. "- Mantén el titular muy cercano al original (cambia solo lo imprescindible para hacerlo unico).\n"
+				. "- No incluyas H1 (el H1 lo pone el titulo del post). Usa H2/H3.\n"
+				. "- No incluyas un parrafo de resumen etiquetado como \"Resumen\".\n"
+				. "- Usa negritas para nombres propios relevantes (artistas, festival, ciudad, recinto, fechas).\n"
+				. "- Evita un tono corporativo; escribe con tono periodistico.\n"
+				. "- No incluyas enlaces externos.\n"
+				. "- Si aportas contexto, que sea util y no repetitivo.\n";
+			if ( $links_hint !== '' ) {
+				$system .= "\n" . $links_hint . "\n";
+			}
+			$system .= "\nEstilos musicales permitidos (slugs): country, dance, electronica, experimental, flamenco, folk, funk, indie, jazz, metal, pop, punk, reggaeton, rock, techno, urbana.\n"
+				. "Devuelve 1-3 estilos relevantes en style_slugs.\n";
+
+			$schema = array(
+				'name' => 'mfu_press_release_post',
+				'schema' => array(
+					'type' => 'object',
+					'additionalProperties' => false,
+					// OpenAI strict JSON schema requires all properties to be listed in `required`.
+					// Use empty strings when a value is not applicable.
+					'required' => array( 'title', 'excerpt', 'content_html', 'yoast_title', 'yoast_metadesc', 'focus_keyphrase', 'style_slugs' ),
+					'properties' => array(
+						'title' => array( 'type' => 'string' ),
+						'excerpt' => array( 'type' => 'string' ),
+						'content_html' => array( 'type' => 'string' ),
+						'yoast_title' => array( 'type' => 'string' ),
+						'yoast_metadesc' => array( 'type' => 'string' ),
+						'focus_keyphrase' => array( 'type' => 'string' ),
+						'style_slugs' => array(
+							'type' => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+					),
+				),
+			);
+
+			$title_hint = $original_title !== '' ? "TITULAR ORIGINAL (referencia): {$original_title}\n\n" : '';
+			$messages = array(
+				array( 'role' => 'system', 'content' => array( array( 'type' => 'text', 'text' => $system ) ) ),
+				array( 'role' => 'user', 'content' => array( array( 'type' => 'text', 'text' => $title_hint . "NOTA DE PRENSA (texto original):\n\n" . $press_text ) ) ),
+			);
+
+			$text = $this->request( $this->model_write, $messages, $schema, 0.2, null, 'rewrite_press_release' );
+			if ( is_wp_error( $text ) ) {
+				return $text;
+			}
+
+			$decoded = $this->decode_json_from_text( $text );
+			if ( ! is_array( $decoded ) ) {
+				return new WP_Error( 'mfu_press_bad_json', 'Invalid JSON from AI' );
+			}
 			return $decoded;
 		}
 
-		if ( preg_match( '/```(?:json)?\\s*(\\{.*\\})\\s*```/s', $trimmed, $matches ) ) {
-			$decoded = json_decode( $matches[1], true );
-			if ( is_array( $decoded ) ) {
-				return $decoded;
+		public function press_release_festival_update_payload( $festival_name, $edition, $current_content, $current_fields, $press_text ) {
+			$festival_name = trim( (string) $festival_name );
+			$edition = trim( (string) $edition );
+			$press_text = is_string( $press_text ) ? trim( $press_text ) : '';
+			$current_content = is_string( $current_content ) ? $current_content : '';
+			$current_fields = is_array( $current_fields ) ? $current_fields : array();
+
+			if ( $festival_name === '' || $press_text === '' ) {
+				return new WP_Error( 'mfu_press_missing', 'Festival name or press release text missing' );
 			}
+
+			$system = "Eres un editor de fichas de festival. A partir de una nota de prensa (siempre veraz), propone actualizaciones para la ficha del festival.\n"
+				. "Reglas:\n"
+				. "- No inventes datos. Si un dato no aparece en la nota, devuelve null para ese campo.\n"
+				. "- No incluyas H1 en el contenido (usa H2/H3).\n"
+				. "- Nombres de artistas en negrita.\n"
+				. "- Evita frases tipo \"segun el comunicado\" o metacomentarios sobre versiones previas.\n"
+				. "- Fechas: devuelve fecha_inicio/fecha_fin en formato YYYYMMDD.\n"
+				. "- mf_artistas: devuelve una lista en una sola linea separada por comas.\n";
+
+			$schema = array(
+				'name' => 'mfu_press_release_festival_update',
+				'schema' => array(
+					'type' => 'object',
+					'additionalProperties' => false,
+					'required' => array( 'summary', 'fields', 'updated_content_html' ),
+					'properties' => array(
+						'summary' => array( 'type' => 'string' ),
+						'fields' => array(
+							'type' => 'object',
+							'additionalProperties' => false,
+							// OpenAI strict JSON schema requires all properties to be listed in `required` at this level.
+							// Use null when a value is not applicable or not present in the press release.
+							'required' => array(
+								'fecha_inicio',
+								'fecha_fin',
+								'mf_artistas',
+								'mf_web_oficial',
+								'mf_instagram',
+								'mf_cartel_completo',
+								'cancelado',
+								'sin_fechas_confirmadas',
+							),
+							'properties' => array(
+								'fecha_inicio' => array( 'type' => array( 'string', 'null' ) ),
+								'fecha_fin' => array( 'type' => array( 'string', 'null' ) ),
+								'mf_artistas' => array( 'type' => array( 'string', 'null' ) ),
+								'mf_web_oficial' => array( 'type' => array( 'string', 'null' ) ),
+								'mf_instagram' => array( 'type' => array( 'string', 'null' ) ),
+								'mf_cartel_completo' => array( 'type' => array( 'string', 'null' ) ),
+								'cancelado' => array( 'type' => array( 'string', 'null' ) ),
+								'sin_fechas_confirmadas' => array( 'type' => array( 'string', 'null' ) ),
+							),
+						),
+						'updated_content_html' => array( 'type' => 'string' ),
+					),
+				),
+			);
+
+			$current_fields_lines = array();
+			foreach ( $current_fields as $k => $v ) {
+				if ( is_scalar( $v ) ) {
+					$current_fields_lines[] = $k . ': ' . (string) $v;
+				}
+			}
+			$current_fields_text = implode( "\n", $current_fields_lines );
+
+			$edition_note = $edition !== '' ? "Edicion objetivo: {$edition}." : '';
+			$user = "FESTIVAL: {$festival_name}\n{$edition_note}\n\nCAMPOS ACTUALES (referencia):\n{$current_fields_text}\n\nCONTENIDO ACTUAL (HTML):\n{$current_content}\n\nNOTA DE PRENSA:\n{$press_text}";
+
+			$messages = array(
+				array( 'role' => 'system', 'content' => array( array( 'type' => 'text', 'text' => $system ) ) ),
+				array( 'role' => 'user', 'content' => array( array( 'type' => 'text', 'text' => $user ) ) ),
+			);
+
+			$text = $this->request( $this->model_write, $messages, $schema, 0.2, null, 'press_release_festival_update' );
+			if ( is_wp_error( $text ) ) {
+				return $text;
+			}
+			$decoded = $this->decode_json_from_text( $text );
+			if ( ! is_array( $decoded ) ) {
+				return new WP_Error( 'mfu_press_festi_bad_json', 'Invalid JSON from AI' );
+			}
+			return $decoded;
 		}
 
-		$start = strpos( $trimmed, '{' );
-		$end = strrpos( $trimmed, '}' );
-		if ( $start !== false && $end !== false && $end > $start ) {
-			$candidate = substr( $trimmed, $start, $end - $start + 1 );
-			$decoded = json_decode( $candidate, true );
-			if ( is_array( $decoded ) ) {
-				return $decoded;
-			}
-		}
-
-		return null;
-	}
-
-		public function extract_facts( $festival_name, $source_text, $source_url, $edition = '', $allow_web_search = true ) {
-		$edition = trim( (string) $edition );
-		$edition_note = $edition ? "Edicion objetivo: {$edition}. Solo acepta hechos que correspondan a esa edicion o al mismo anio." : "No se indica edicion; no asumas anio.";
+			public function extract_facts( $festival_name, $source_text, $source_url, $edition = '', $allow_web_search = true ) {
+			$edition = trim( (string) $edition );
+			$edition_note = $edition ? "Edicion objetivo: {$edition}. Solo acepta hechos que correspondan a esa edicion o al mismo anio." : "No se indica edicion; no asumas anio.";
 		$system = "Eres un analista editorial. Extrae solo hechos verificables del texto. No inventes nada. {$edition_note} "
 			. "Si el texto referencia explicitamente otra edicion o anio distinto, ignora esos datos. "
 			. "Fechas: si hay rango (\"del X al Y\"), rellena date_start y date_end. Si hay una sola fecha, usa la misma para ambos. "

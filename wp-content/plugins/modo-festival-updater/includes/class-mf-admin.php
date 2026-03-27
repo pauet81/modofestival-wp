@@ -47,10 +47,13 @@ class MFU_Admin {
 		add_action( 'admin_post_mfu_news_check', array( $this, 'handle_news_check' ) );
 		add_action( 'admin_post_mfu_news_extract', array( $this, 'handle_news_extract' ) );
 		add_action( 'admin_post_mfu_news_dismiss', array( $this, 'handle_news_dismiss' ) );
-		add_action( 'admin_post_mfu_news_refresh', array( $this, 'handle_news_refresh' ) );
-		add_action( 'wp_ajax_mfu_festival_search', array( $this, 'ajax_festival_search' ) );
-		add_action( 'admin_post_mfu_add_festival', array( $this, 'handle_add_festival' ) );
-	}
+				add_action( 'admin_post_mfu_news_refresh', array( $this, 'handle_news_refresh' ) );
+				add_action( 'wp_ajax_mfu_festival_search', array( $this, 'ajax_festival_search' ) );
+				add_action( 'admin_post_mfu_add_festival', array( $this, 'handle_add_festival' ) );
+				add_action( 'admin_post_mfu_press_release_process', array( $this, 'handle_press_release_process' ) );
+				add_action( 'admin_post_mfu_external_news_check', array( $this, 'handle_external_news_check' ) );
+				add_action( 'admin_post_mfu_external_news_process', array( $this, 'handle_external_news_process' ) );
+		}
 
 	public function output_admin_styles() {
 		if ( empty( $_GET['page'] ) || 'mfu-updates' !== $_GET['page'] ) {
@@ -87,18 +90,34 @@ class MFU_Admin {
 			'mfu-add-festival',
 			array( $this, 'render_add_festival_page' )
 		);
-		add_submenu_page(
-			'mfu-updates',
-			'Actualizacion via Noticias',
-			'Actualizacion via Noticias',
-			'manage_options',
-			'mfu-news-update',
-			array( $this, 'render_news_update_page' )
-		);
-		add_submenu_page(
-			'mfu-updates',
-			'Fuentes',
-			'Fuentes',
+			add_submenu_page(
+				'mfu-updates',
+				'Actualizacion via Noticias',
+				'Actualizacion via Noticias',
+				'manage_options',
+				'mfu-news-update',
+				array( $this, 'render_news_update_page' )
+			);
+			add_submenu_page(
+				'mfu-updates',
+				'Notas de prensa',
+				'Notas de prensa',
+				'manage_options',
+				'mfu-press-releases',
+				array( $this, 'render_press_releases_page' )
+			);
+			add_submenu_page(
+				'mfu-updates',
+				'Noticias (URL)',
+				'Noticias (URL)',
+				'manage_options',
+				'mfu-external-news',
+				array( $this, 'render_external_news_page' )
+			);
+			add_submenu_page(
+				'mfu-updates',
+				'Fuentes',
+				'Fuentes',
 			'manage_options',
 			'mfu-sources',
 			array( $this, 'render_sources_page' )
@@ -1433,7 +1452,7 @@ class MFU_Admin {
 		echo '</div>';
 	}
 
-	public function render_news_update_page() {
+		public function render_news_update_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
@@ -1537,12 +1556,12 @@ class MFU_Admin {
 					}, 200);
 				});
 			})();
-			</script>";
-		}
+				</script>";
+			}
 
-		if ( $news_url !== '' && $festival_title !== '' ) {
-			echo '<hr />';
-			echo '<p><strong>Festival encontrado:</strong> ' . esc_html( $festival_title ) . '</p>';
+			if ( $news_url !== '' && $festival_title !== '' ) {
+				echo '<hr />';
+				echo '<p><strong>Festival encontrado:</strong> ' . esc_html( $festival_title ) . '</p>';
 			if ( $confidence !== '' ) {
 				echo '<p><strong>Confianza IA:</strong> ' . esc_html( $confidence ) . '</p>';
 			}
@@ -1555,13 +1574,938 @@ class MFU_Admin {
 		}
 
 		$this->render_news_rss_feed();
-		$this->render_recent_news_updates();
-		echo '</div>';
-	}
+			$this->render_recent_news_updates();
+			echo '</div>';
+		}
 
-	public function render_add_festival_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
+		public function render_press_releases_page() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return;
+			}
+
+			$message = isset( $_GET['mfu_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_msg'] ) ) : '';
+			$error = isset( $_GET['mfu_err'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_err'] ) ) : '';
+			$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
+			$update_id = isset( $_GET['update_id'] ) ? (int) $_GET['update_id'] : 0;
+
+			echo '<div class="wrap">';
+			echo '<h1>Notas de prensa</h1>';
+			echo '<p>Pega una nota de prensa tal cual la recibes y elige si quieres republicarla (reescrita) o usarla para preparar una actualizacion de un festival.</p>';
+
+			if ( $error !== '' ) {
+				echo '<div class="notice notice-error"><p>' . esc_html( $error ) . '</p></div>';
+			}
+			if ( $message !== '' ) {
+				echo '<div class="notice notice-success"><p>' . esc_html( $message ) . '</p></div>';
+			}
+
+			if ( $post_id > 0 ) {
+				$edit = get_edit_post_link( $post_id, '' );
+				if ( $edit ) {
+					echo '<p><a class="button button-primary" href="' . esc_url( $edit ) . '" target="_blank" rel="noopener">Editar borrador generado</a></p>';
+				}
+			}
+			if ( $update_id > 0 ) {
+				$view_url = admin_url( 'admin.php?page=mfu-updates&update_id=' . $update_id );
+				echo '<p><a class="button button-primary" href="' . esc_url( $view_url ) . '" target="_blank" rel="noopener">Ver cambios del festival</a></p>';
+			}
+
+			echo '<hr />';
+
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			wp_nonce_field( 'mfu_press_release_process', '_mfu_nonce' );
+			echo '<input type="hidden" name="action" value="mfu_press_release_process" />';
+			echo '<table class="form-table"><tbody>';
+
+			echo '<tr>';
+			echo '<th scope="row"><label for="mfu_press_text">Contenido de la nota de prensa</label></th>';
+			echo '<td><textarea id="mfu_press_text" name="press_text" rows="12" style="width:100%;" placeholder="Pega aqui la nota de prensa completa..." required></textarea>';
+			echo '<p class="description">Tip: pega el texto completo, incluyendo fecha y ciudad si aparecen. No hace falta que limpies formatos.</p></td>';
+			echo '</tr>';
+
+			echo '<tr>';
+			echo '<th scope="row">Accion</th>';
+			echo '<td>';
+			echo '<label style="display:block; margin:4px 0;"><input type="radio" name="press_mode" value="republish" checked /> Republicar nota de prensa (reescritura SEO + borrador)</label>';
+			echo '<label style="display:block; margin:4px 0;"><input type="radio" name="press_mode" value="festival_update" /> Actualizacion de festival (preparar cambios)</label>';
+			echo '</td>';
+			echo '</tr>';
+
+			echo '<tr id="mfu_press_festival_row" style="display:none;">';
+			echo '<th scope="row"><label for="mfu_press_festival_search">Festival</label></th>';
+			echo '<td>';
+			echo '<input type="hidden" id="mfu_press_festival_id" name="festival_id" value="" />';
+			echo '<input type="text" class="regular-text" id="mfu_press_festival_search" placeholder="Buscar festival..." autocomplete="off" />';
+			echo '<div id="mfu_press_festival_results" style="margin-top:8px; max-height:220px; overflow:auto; border:1px solid #ccd0d4; background:#fff; display:none;"></div>';
+			echo '<p class="description">Selecciona el festival al que hace referencia la nota de prensa.</p>';
+			echo '</td>';
+			echo '</tr>';
+
+			echo '</tbody></table>';
+
+			echo '<p><button type="submit" class="button button-primary">Procesar nota de prensa</button></p>';
+			echo '</form>';
+
+			echo "<script>
+			(function(){
+				var radios = document.querySelectorAll('input[name=\"press_mode\"]');
+				var row = document.getElementById('mfu_press_festival_row');
+				function refresh(){
+					var mode = document.querySelector('input[name=\"press_mode\"]:checked');
+					var show = mode && mode.value === 'festival_update';
+					if (row) row.style.display = show ? '' : 'none';
+				}
+				radios.forEach(function(r){ r.addEventListener('change', refresh); });
+				refresh();
+
+				// Festival search (AJAX)
+				var input = document.getElementById('mfu_press_festival_search');
+				var results = document.getElementById('mfu_press_festival_results');
+				var hidden = document.getElementById('mfu_press_festival_id');
+				if (!input || !results || !hidden) return;
+				var timer;
+				function render(items){
+					if (!items.length) {
+						results.style.display = 'none';
+						results.innerHTML = '';
+						return;
+					}
+					results.innerHTML = '';
+					items.forEach(function(item){
+						var btn = document.createElement('button');
+						btn.type = 'button';
+						btn.className = 'button-link';
+						btn.style.display = 'block';
+						btn.style.padding = '6px 10px';
+						btn.style.textAlign = 'left';
+						btn.style.width = '100%';
+						btn.textContent = item.title;
+						btn.addEventListener('click', function(){
+							hidden.value = item.id;
+							input.value = item.title;
+							results.style.display = 'none';
+						});
+						results.appendChild(btn);
+					});
+					results.style.display = 'block';
+				}
+				input.addEventListener('input', function(){
+					var q = input.value.trim();
+					hidden.value = '';
+					if (q.length < 2) {
+						render([]);
+						return;
+					}
+					clearTimeout(timer);
+					timer = setTimeout(function(){
+						var url = ajaxurl + '?action=mfu_festival_search&q=' + encodeURIComponent(q);
+						fetch(url, { credentials: 'same-origin' })
+							.then(function(r){ return r.json(); })
+							.then(function(data){ render(Array.isArray(data) ? data : []); })
+							.catch(function(){ render([]); });
+					}, 200);
+				});
+			})();
+			</script>";
+
+			echo '</div>';
+		}
+
+		public function handle_press_release_process() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_die( 'No permitido' );
+			}
+
+			check_admin_referer( 'mfu_press_release_process', '_mfu_nonce' );
+
+			$press_text = isset( $_POST['press_text'] ) ? wp_unslash( $_POST['press_text'] ) : '';
+			$press_text = is_string( $press_text ) ? trim( $press_text ) : '';
+			$mode = isset( $_POST['press_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['press_mode'] ) ) : 'republish';
+			$festival_id = isset( $_POST['festival_id'] ) ? (int) $_POST['festival_id'] : 0;
+
+			$back = admin_url( 'admin.php?page=mfu-press-releases' );
+			if ( $press_text === '' ) {
+				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'La nota de prensa esta vacia.' ), $back ) );
+				exit;
+			}
+
+			$ai = new MFU_AI();
+			if ( ! $ai->has_openai_key() && ! $ai->has_perplexity_key() ) {
+				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Falta API key para usar IA.' ), $back ) );
+				exit;
+			}
+
+			if ( $mode === 'festival_update' ) {
+				if ( $festival_id <= 0 || get_post_type( $festival_id ) !== 'festi' ) {
+					wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Selecciona un festival valido.' ), $back ) );
+					exit;
+				}
+				$festival = get_post( $festival_id );
+				if ( ! $festival ) {
+					wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Festival no encontrado.' ), $back ) );
+					exit;
+				}
+
+				$current_fields = array(
+					'fecha_inicio' => (string) get_post_meta( $festival_id, 'fecha_inicio', true ),
+					'fecha_fin' => (string) get_post_meta( $festival_id, 'fecha_fin', true ),
+					'mf_artistas' => (string) get_post_meta( $festival_id, 'mf_artistas', true ),
+					'mf_web_oficial' => (string) get_post_meta( $festival_id, 'mf_web_oficial', true ),
+					'mf_instagram' => (string) get_post_meta( $festival_id, 'mf_instagram', true ),
+					'mf_cartel_completo' => (string) get_post_meta( $festival_id, 'mf_cartel_completo', true ),
+					'cancelado' => (string) get_post_meta( $festival_id, 'cancelado', true ),
+					'sin_fechas_confirmadas' => (string) get_post_meta( $festival_id, 'sin_fechas_confirmadas', true ),
+				);
+				$edition = (string) get_post_meta( $festival_id, 'edicion', true );
+
+				$payload = $ai->press_release_festival_update_payload(
+					(string) $festival->post_title,
+					$edition,
+					(string) $festival->post_content,
+					$current_fields,
+					$press_text
+				);
+				if ( is_wp_error( $payload ) ) {
+					wp_redirect( add_query_arg( 'mfu_err', rawurlencode( $payload->get_error_message() ), $back ) );
+					exit;
+				}
+
+				$fields = isset( $payload['fields'] ) && is_array( $payload['fields'] ) ? $payload['fields'] : array();
+				$updated_content = isset( $payload['updated_content_html'] ) ? (string) $payload['updated_content_html'] : '';
+				$summary = isset( $payload['summary'] ) ? (string) $payload['summary'] : '';
+
+				$diffs = array();
+				foreach ( array( 'fecha_inicio', 'fecha_fin', 'mf_artistas', 'mf_web_oficial', 'mf_instagram', 'mf_cartel_completo', 'cancelado', 'sin_fechas_confirmadas' ) as $key ) {
+					if ( ! array_key_exists( $key, $fields ) ) {
+						continue;
+					}
+					$after = $fields[ $key ];
+					if ( $after === null ) {
+						continue;
+					}
+					$after = is_string( $after ) ? trim( $after ) : (string) $after;
+					$before = isset( $current_fields[ $key ] ) ? (string) $current_fields[ $key ] : '';
+					if ( $after === $before ) {
+						continue;
+					}
+					$diffs[ $key ] = array(
+						'before' => $before,
+						'after' => $after,
+					);
+				}
+
+				if ( empty( $diffs ) && $updated_content !== '' ) {
+					$current_content = (string) $festival->post_content;
+					if ( trim( $updated_content ) !== trim( $current_content ) ) {
+						$diffs['content_update'] = array(
+							'before' => 'content',
+							'after' => 'content',
+						);
+					}
+				}
+
+				if ( empty( $diffs ) ) {
+					wp_redirect( add_query_arg( 'mfu_msg', rawurlencode( 'No se detectaron cambios aplicables.' ), $back ) );
+					exit;
+				}
+
+				global $wpdb;
+				$table = MFU_DB::table( 'updates' );
+				$evidence = array(
+					'facts' => array( 'summary' => $summary ),
+					'sources' => array(
+						array( 'url' => 'press_release', 'title' => 'Nota de prensa (pegada manualmente)' ),
+					),
+					'press_release' => mb_substr( $press_text, 0, 20000 ),
+					'updated_content' => $updated_content,
+				);
+				$wpdb->insert(
+					$table,
+					array(
+						'festival_id' => (int) $festival_id,
+						'detected_at' => current_time( 'mysql' ),
+						'status' => 'pending_review',
+						'diffs_json' => wp_json_encode( $diffs ),
+						'evidence_json' => wp_json_encode( $evidence ),
+						'summary' => $summary,
+					),
+					array( '%d', '%s', '%s', '%s', '%s', '%s' )
+				);
+				$update_id = (int) $wpdb->insert_id;
+				wp_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Actualizacion preparada.' ), 'update_id' => $update_id ), $back ) );
+				exit;
+			}
+
+				$original_title = '';
+				$lines = preg_split( "/\\r\\n|\\r|\\n/", $press_text );
+				if ( is_array( $lines ) ) {
+					foreach ( $lines as $line ) {
+						$line = trim( (string) $line );
+						if ( $line === '' ) {
+							continue;
+						}
+						$original_title = $line;
+						break;
+					}
+				}
+				if ( strlen( $original_title ) > 140 ) {
+					$original_title = substr( $original_title, 0, 140 );
+				}
+
+				$author_id = (int) get_current_user_id();
+				$carla = get_user_by( 'login', 'Carla' );
+				if ( $carla && ! is_wp_error( $carla ) ) {
+					$author_id = (int) $carla->ID;
+				} else {
+					$clara = get_user_by( 'login', 'Clara' );
+					if ( $clara && ! is_wp_error( $clara ) ) {
+						$author_id = (int) $clara->ID;
+					}
+				}
+
+				$internal_links = array(
+					'agenda' => home_url( '/agenda-festivales/' ),
+				);
+				$draft = $ai->rewrite_press_release_to_post( $press_text, $internal_links, $original_title );
+			if ( is_wp_error( $draft ) ) {
+				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( $draft->get_error_message() ), $back ) );
+				exit;
+			}
+
+			$title = isset( $draft['title'] ) ? (string) $draft['title'] : '';
+			$excerpt = isset( $draft['excerpt'] ) ? (string) $draft['excerpt'] : '';
+			$content = isset( $draft['content_html'] ) ? (string) $draft['content_html'] : '';
+			$yoast_title = isset( $draft['yoast_title'] ) ? (string) $draft['yoast_title'] : '';
+			$yoast_desc = isset( $draft['yoast_metadesc'] ) ? (string) $draft['yoast_metadesc'] : '';
+				$focus_kw = isset( $draft['focus_keyphrase'] ) ? (string) $draft['focus_keyphrase'] : '';
+				$style_slugs = isset( $draft['style_slugs'] ) && is_array( $draft['style_slugs'] ) ? array_map( 'sanitize_title', $draft['style_slugs'] ) : array();
+
+			if ( trim( $title ) === '' || trim( $content ) === '' ) {
+				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( 'La IA no devolvio contenido valido.' ), $back ) );
+				exit;
+			}
+
+			$post_id = wp_insert_post(
+				array(
+					'post_type' => 'post',
+					'post_status' => 'draft',
+					'post_title' => $title,
+					'post_content' => $content,
+					'post_excerpt' => $excerpt,
+						'post_author' => $author_id,
+					),
+					true
+				);
+
+			if ( is_wp_error( $post_id ) ) {
+				wp_redirect( add_query_arg( 'mfu_err', rawurlencode( $post_id->get_error_message() ), $back ) );
+				exit;
+			}
+
+			$post_id = (int) $post_id;
+				$cat_pr = get_term_by( 'slug', 'notas-de-prensa', 'category' );
+				$cat_act = get_term_by( 'slug', 'actualidad', 'category' );
+				$cats = array();
+				if ( $cat_pr && ! is_wp_error( $cat_pr ) ) {
+					$cats[] = (int) $cat_pr->term_id;
+				}
+				if ( $cat_act && ! is_wp_error( $cat_act ) ) {
+					$cats[] = (int) $cat_act->term_id;
+				}
+				if ( ! empty( $cats ) ) {
+					wp_set_post_terms( $post_id, $cats, 'category', false );
+				}
+				$cat_uncat = get_term_by( 'slug', 'sin-categorizar', 'category' );
+				if ( $cat_uncat && ! is_wp_error( $cat_uncat ) ) {
+					wp_remove_object_terms( $post_id, array( (int) $cat_uncat->term_id ), 'category' );
+				}
+
+				if ( ! empty( $style_slugs ) ) {
+					$valid = array();
+					foreach ( $style_slugs as $slug ) {
+						if ( $slug === '' ) {
+							continue;
+						}
+						$term = get_term_by( 'slug', $slug, 'estilo_musical' );
+						if ( $term && ! is_wp_error( $term ) ) {
+							$valid[] = (int) $term->term_id;
+						}
+					}
+					if ( ! empty( $valid ) ) {
+						wp_set_post_terms( $post_id, $valid, 'estilo_musical', false );
+					}
+				}
+
+			if ( $yoast_title !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_title', $yoast_title );
+			}
+			if ( $yoast_desc !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_metadesc', $yoast_desc );
+			}
+			if ( $focus_kw !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_focuskw', $focus_kw );
+			}
+
+			wp_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Borrador creado.' ), 'post_id' => $post_id ), $back ) );
+			exit;
+		}
+
+		private function get_external_news_transient_key() {
+			return 'mfu_external_news_extract_' . (int) get_current_user_id();
+		}
+
+		private function fetch_external_news_text( $url ) {
+			$url = esc_url_raw( (string) $url );
+			if ( $url === '' ) {
+				return new WP_Error( 'mfu_external_news_url', 'URL invalida' );
+			}
+			$parts = wp_parse_url( $url );
+			$scheme = isset( $parts['scheme'] ) ? strtolower( (string) $parts['scheme'] ) : '';
+			if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+				return new WP_Error( 'mfu_external_news_url', 'URL invalida (scheme)' );
+			}
+
+			$options = get_option( MFU_OPTION_KEY, array() );
+			$timeout = isset( $options['timeout'] ) ? max( 5, (int) $options['timeout'] ) : 15;
+			$timeout = min( 25, max( 10, $timeout ) );
+
+			$args = array(
+				'timeout' => $timeout,
+				'redirection' => 3,
+				'headers' => array(
+					'User-Agent' => 'MFU/1.0 (+external-news)',
+					'Accept' => 'text/html,application/xhtml+xml',
+				),
+			);
+			$response = wp_remote_get( $url, $args );
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			$body = (string) wp_remote_retrieve_body( $response );
+			if ( $code < 200 || $code >= 300 || $body === '' ) {
+				return new WP_Error( 'mfu_external_news_fetch', 'No se pudo descargar la noticia (' . $code . ')' );
+			}
+
+			$title = '';
+			if ( preg_match( '/<meta[^>]+property=[\"\\\']og:title[\"\\\'][^>]+content=[\"\\\']([^\"\\\']+)[\"\\\']/i', $body, $m ) ) {
+				$title = trim( wp_strip_all_tags( $m[1] ) );
+			}
+			if ( $title === '' && preg_match( '/<title[^>]*>(.*?)<\\/title>/is', $body, $m ) ) {
+				$title = trim( wp_strip_all_tags( $m[1] ) );
+			}
+
+			$body = preg_replace( '/<script\\b[^>]*>.*?<\\/script>/is', ' ', $body );
+			$body = preg_replace( '/<style\\b[^>]*>.*?<\\/style>/is', ' ', $body );
+			$text = wp_strip_all_tags( $body );
+			$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5 );
+			$text = preg_replace( '/\\s+/', ' ', $text );
+			$text = trim( $text );
+
+			if ( strlen( $text ) < 400 ) {
+				return new WP_Error( 'mfu_external_news_extract', 'No se pudo extraer texto suficiente de la URL.' );
+			}
+			if ( strlen( $text ) > 20000 ) {
+				$text = substr( $text, 0, 20000 );
+			}
+
+			return array(
+				'title' => $title,
+				'text' => $text,
+			);
+		}
+
+		public function render_external_news_page() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return;
+			}
+
+			$message = isset( $_GET['mfu_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_msg'] ) ) : '';
+			$error = isset( $_GET['mfu_err'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_err'] ) ) : '';
+			$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
+			$update_id = isset( $_GET['update_id'] ) ? (int) $_GET['update_id'] : 0;
+
+			$state = get_transient( $this->get_external_news_transient_key() );
+			$state = is_array( $state ) ? $state : array();
+			$source_url = isset( $state['url'] ) ? (string) $state['url'] : '';
+			$extracted_title = isset( $state['title'] ) ? (string) $state['title'] : '';
+			$extracted_text = isset( $state['text'] ) ? (string) $state['text'] : '';
+			$extracted_ok = ! empty( $state['ok'] );
+
+			echo '<div class="wrap">';
+			echo '<h1>Noticias (URL)</h1>';
+			echo '<p>Introduce una URL de una noticia externa. Primero se intentara extraer el contenido automaticamente; si no es posible, podras pegar el texto manualmente. Luego puedes crear un borrador reescrito o preparar una actualizacion de un festival.</p>';
+
+			if ( $error !== '' ) {
+				echo '<div class="notice notice-error"><p>' . esc_html( $error ) . '</p></div>';
+			}
+			if ( $message !== '' ) {
+				echo '<div class="notice notice-success"><p>' . esc_html( $message ) . '</p></div>';
+			}
+
+			if ( $post_id > 0 ) {
+				$edit = get_edit_post_link( $post_id, '' );
+				if ( $edit ) {
+					echo '<p><a class="button button-primary" href="' . esc_url( $edit ) . '" target="_blank" rel="noopener">Editar borrador generado</a></p>';
+				}
+			}
+			if ( $update_id > 0 ) {
+				$view_url = admin_url( 'admin.php?page=mfu-updates&update_id=' . $update_id );
+				echo '<p><a class="button button-primary" href="' . esc_url( $view_url ) . '" target="_blank" rel="noopener">Ver cambios del festival</a></p>';
+			}
+
+			echo '<hr />';
+
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="max-width:980px;">';
+			wp_nonce_field( 'mfu_external_news_check', '_mfu_nonce' );
+			echo '<input type="hidden" name="action" value="mfu_external_news_check" />';
+			echo '<table class="form-table"><tbody>';
+			echo '<tr>';
+			echo '<th scope="row"><label for="mfu_external_news_url">URL de la noticia</label></th>';
+			echo '<td><input type="url" class="regular-text" style="width:100%; max-width:760px;" id="mfu_external_news_url" name="news_url" placeholder="https://..." value="' . esc_attr( $source_url ) . '" required />';
+			echo '<p class="description">Pulsa "Comprobar" para intentar extraer el contenido automaticamente.</p>';
+			echo '<p><button type="submit" class="button">Comprobar URL</button></p>';
+			echo '</td>';
+			echo '</tr>';
+			echo '</tbody></table>';
+			echo '</form>';
+
+			echo '<hr />';
+
+			if ( $source_url === '' ) {
+				echo '</div>';
+				return;
+			}
+
+			if ( $extracted_ok ) {
+				echo '<div class="notice notice-success"><p>Contenido extraido correctamente.</p></div>';
+				if ( $extracted_title !== '' ) {
+					echo '<p><strong>Titulo detectado:</strong> ' . esc_html( $extracted_title ) . '</p>';
+				}
+			} else {
+				echo '<div class="notice notice-warning"><p>No se pudo extraer el contenido. Pega el texto manualmente en el campo de abajo.</p></div>';
+			}
+
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="max-width:980px;">';
+			wp_nonce_field( 'mfu_external_news_process', '_mfu_nonce' );
+			echo '<input type="hidden" name="action" value="mfu_external_news_process" />';
+			echo '<input type="hidden" name="news_url" value="' . esc_attr( $source_url ) . '" />';
+			echo '<input type="hidden" name="original_title" value="' . esc_attr( $extracted_title ) . '" />';
+
+			echo '<table class="form-table"><tbody>';
+			echo '<tr>';
+			echo '<th scope="row"><label for="mfu_external_news_text">Contenido</label></th>';
+			echo '<td><textarea id="mfu_external_news_text" name="article_text" rows="12" style="width:100%;" placeholder="Si no se pudo extraer automaticamente, pega aqui el texto completo..." required>' . esc_textarea( $extracted_text ) . '</textarea>';
+			echo '<p class="description">Puedes editar el texto antes de procesar.</p></td>';
+			echo '</tr>';
+
+			echo '<tr>';
+			echo '<th scope="row">Accion</th>';
+			echo '<td>';
+			echo '<label style="display:block; margin:4px 0;"><input type="radio" name="news_mode" value="republish" checked /> Crear entrada en borrador (reescritura SEO)</label>';
+			echo '<label style="display:block; margin:4px 0;"><input type="radio" name="news_mode" value="festival_update" /> Actualizacion de festival (preparar cambios)</label>';
+			echo '</td>';
+			echo '</tr>';
+
+			echo '<tr id="mfu_external_news_festival_row" style="display:none;">';
+			echo '<th scope="row"><label for="mfu_external_news_festival_search">Festival</label></th>';
+			echo '<td>';
+			echo '<input type="hidden" id="mfu_external_news_festival_id" name="festival_id" value="" />';
+			echo '<input type="text" class="regular-text" id="mfu_external_news_festival_search" placeholder="Buscar festival..." autocomplete="off" />';
+			echo '<div id="mfu_external_news_festival_results" style="margin-top:8px; max-height:220px; overflow:auto; border:1px solid #ccd0d4; background:#fff; display:none;"></div>';
+			echo '<p class="description">Selecciona el festival al que hace referencia la noticia.</p>';
+			echo '</td>';
+			echo '</tr>';
+
+			echo '</tbody></table>';
+
+			echo '<p><button type="submit" class="button button-primary">Procesar noticia</button></p>';
+			echo '</form>';
+
+			echo "<script>
+			(function(){
+				var radios = document.querySelectorAll('input[name=\"news_mode\"]');
+				var row = document.getElementById('mfu_external_news_festival_row');
+				function refresh(){
+					var mode = document.querySelector('input[name=\"news_mode\"]:checked');
+					var show = mode && mode.value === 'festival_update';
+					if (row) row.style.display = show ? '' : 'none';
+				}
+				radios.forEach(function(r){ r.addEventListener('change', refresh); });
+				refresh();
+
+				// Festival search (AJAX)
+				var input = document.getElementById('mfu_external_news_festival_search');
+				var results = document.getElementById('mfu_external_news_festival_results');
+				var hidden = document.getElementById('mfu_external_news_festival_id');
+				if (!input || !results || !hidden) return;
+				var timer;
+				function render(items){
+					if (!items.length) {
+						results.style.display = 'none';
+						results.innerHTML = '';
+						return;
+					}
+					results.innerHTML = '';
+					items.forEach(function(item){
+						var btn = document.createElement('button');
+						btn.type = 'button';
+						btn.className = 'button-link';
+						btn.style.display = 'block';
+						btn.style.padding = '6px 10px';
+						btn.style.textAlign = 'left';
+						btn.style.width = '100%';
+						btn.textContent = item.title;
+						btn.addEventListener('click', function(){
+							hidden.value = item.id;
+							input.value = item.title;
+							results.style.display = 'none';
+						});
+						results.appendChild(btn);
+					});
+					results.style.display = 'block';
+				}
+				input.addEventListener('input', function(){
+					var q = input.value.trim();
+					hidden.value = '';
+					if (q.length < 2) {
+						render([]);
+						return;
+					}
+					clearTimeout(timer);
+					timer = setTimeout(function(){
+						var url = ajaxurl + '?action=mfu_festival_search&q=' + encodeURIComponent(q);
+						fetch(url, { credentials: 'same-origin' })
+							.then(function(r){ return r.json(); })
+							.then(function(data){ render(Array.isArray(data) ? data : []); })
+							.catch(function(){ render([]); });
+					}, 200);
+				});
+			})();
+			</script>";
+
+			echo '</div>';
+		}
+
+		public function handle_external_news_check() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_die( 'No permitido' );
+			}
+
+			check_admin_referer( 'mfu_external_news_check', '_mfu_nonce' );
+
+			$url = isset( $_POST['news_url'] ) ? esc_url_raw( wp_unslash( $_POST['news_url'] ) ) : '';
+			$back = admin_url( 'admin.php?page=mfu-external-news' );
+			if ( $url === '' ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'URL invalida.' ), $back ) );
+				exit;
+			}
+
+			$payload = $this->fetch_external_news_text( $url );
+			if ( is_wp_error( $payload ) ) {
+				set_transient(
+					$this->get_external_news_transient_key(),
+					array(
+						'ok' => false,
+						'url' => $url,
+						'title' => '',
+						'text' => '',
+						'error' => $payload->get_error_message(),
+						'at' => time(),
+					),
+					10 * MINUTE_IN_SECONDS
+				);
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( $payload->get_error_message() ), $back ) );
+				exit;
+			}
+
+			set_transient(
+				$this->get_external_news_transient_key(),
+				array(
+					'ok' => true,
+					'url' => $url,
+					'title' => isset( $payload['title'] ) ? (string) $payload['title'] : '',
+					'text' => isset( $payload['text'] ) ? (string) $payload['text'] : '',
+					'error' => '',
+					'at' => time(),
+				),
+				10 * MINUTE_IN_SECONDS
+			);
+
+			wp_safe_redirect( add_query_arg( 'mfu_msg', rawurlencode( 'URL comprobada.' ), $back ) );
+			exit;
+		}
+
+		private function get_preferred_author_id() {
+			$author_id = (int) get_current_user_id();
+			$carla = get_user_by( 'login', 'carla' );
+			if ( ! $carla ) {
+				$carla = get_user_by( 'login', 'Carla' );
+			}
+			if ( $carla && ! is_wp_error( $carla ) ) {
+				return (int) $carla->ID;
+			}
+			$clara = get_user_by( 'login', 'clara' );
+			if ( ! $clara ) {
+				$clara = get_user_by( 'login', 'Clara' );
+			}
+			if ( $clara && ! is_wp_error( $clara ) ) {
+				return (int) $clara->ID;
+			}
+			return $author_id;
+		}
+
+		private function get_style_catalog_links() {
+			$map = array();
+			$terms = get_terms(
+				array(
+					'taxonomy' => 'estilo_musical',
+					'hide_empty' => false,
+				)
+			);
+			if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+				return $map;
+			}
+			foreach ( $terms as $t ) {
+				if ( ! isset( $t->slug ) ) {
+					continue;
+				}
+				$slug = sanitize_title( (string) $t->slug );
+				if ( $slug === '' ) {
+					continue;
+				}
+				$link = get_term_link( $t );
+				if ( is_wp_error( $link ) ) {
+					continue;
+				}
+				$map[ $slug ] = (string) $link;
+			}
+			return $map;
+		}
+
+		public function handle_external_news_process() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_die( 'No permitido' );
+			}
+
+			check_admin_referer( 'mfu_external_news_process', '_mfu_nonce' );
+
+			$source_url = isset( $_POST['news_url'] ) ? esc_url_raw( wp_unslash( $_POST['news_url'] ) ) : '';
+			$article_text = isset( $_POST['article_text'] ) ? wp_unslash( $_POST['article_text'] ) : '';
+			$article_text = is_string( $article_text ) ? trim( $article_text ) : '';
+			$original_title = isset( $_POST['original_title'] ) ? sanitize_text_field( wp_unslash( $_POST['original_title'] ) ) : '';
+			$mode = isset( $_POST['news_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['news_mode'] ) ) : 'republish';
+			$festival_id = isset( $_POST['festival_id'] ) ? (int) $_POST['festival_id'] : 0;
+
+			$back = admin_url( 'admin.php?page=mfu-external-news' );
+
+			if ( $source_url === '' ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'URL invalida.' ), $back ) );
+				exit;
+			}
+			if ( $article_text === '' ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Falta el texto de la noticia.' ), $back ) );
+				exit;
+			}
+
+			$ai = new MFU_AI();
+			if ( ! $ai->has_openai_key() && ! $ai->has_perplexity_key() ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Falta API key para usar IA.' ), $back ) );
+				exit;
+			}
+
+			if ( $mode === 'festival_update' ) {
+				if ( $festival_id <= 0 || get_post_type( $festival_id ) !== 'festi' ) {
+					wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Selecciona un festival valido.' ), $back ) );
+					exit;
+				}
+				$festival = get_post( $festival_id );
+				if ( ! $festival ) {
+					wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'Festival no encontrado.' ), $back ) );
+					exit;
+				}
+
+				$current_fields = array(
+					'fecha_inicio' => (string) get_post_meta( $festival_id, 'fecha_inicio', true ),
+					'fecha_fin' => (string) get_post_meta( $festival_id, 'fecha_fin', true ),
+					'mf_artistas' => (string) get_post_meta( $festival_id, 'mf_artistas', true ),
+					'mf_web_oficial' => (string) get_post_meta( $festival_id, 'mf_web_oficial', true ),
+					'mf_instagram' => (string) get_post_meta( $festival_id, 'mf_instagram', true ),
+					'mf_cartel_completo' => (string) get_post_meta( $festival_id, 'mf_cartel_completo', true ),
+					'cancelado' => (string) get_post_meta( $festival_id, 'cancelado', true ),
+					'sin_fechas_confirmadas' => (string) get_post_meta( $festival_id, 'sin_fechas_confirmadas', true ),
+				);
+				$edition = (string) get_post_meta( $festival_id, 'edicion', true );
+
+				$payload = $ai->external_news_festival_update_payload(
+					(string) $festival->post_title,
+					$edition,
+					(string) $festival->post_content,
+					$current_fields,
+					$source_url,
+					$article_text
+				);
+				if ( is_wp_error( $payload ) ) {
+					wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( $payload->get_error_message() ), $back ) );
+					exit;
+				}
+
+				$fields = isset( $payload['fields'] ) && is_array( $payload['fields'] ) ? $payload['fields'] : array();
+				$updated_content = isset( $payload['updated_content_html'] ) ? (string) $payload['updated_content_html'] : '';
+				$summary = isset( $payload['summary'] ) ? (string) $payload['summary'] : '';
+
+				$diffs = array();
+				foreach ( array( 'fecha_inicio', 'fecha_fin', 'mf_artistas', 'mf_web_oficial', 'mf_instagram', 'mf_cartel_completo', 'cancelado', 'sin_fechas_confirmadas' ) as $key ) {
+					if ( ! array_key_exists( $key, $fields ) ) {
+						continue;
+					}
+					$after = $fields[ $key ];
+					if ( $after === null ) {
+						continue;
+					}
+					$after = is_string( $after ) ? trim( $after ) : (string) $after;
+					$before = isset( $current_fields[ $key ] ) ? (string) $current_fields[ $key ] : '';
+					if ( $after === $before ) {
+						continue;
+					}
+					$diffs[ $key ] = array(
+						'before' => $before,
+						'after' => $after,
+					);
+				}
+				if ( empty( $diffs ) && $updated_content !== '' ) {
+					$current_content = (string) $festival->post_content;
+					if ( trim( $updated_content ) !== trim( $current_content ) ) {
+						$diffs['content_update'] = array(
+							'before' => 'content',
+							'after' => 'content',
+						);
+					}
+				}
+				if ( empty( $diffs ) ) {
+					wp_safe_redirect( add_query_arg( 'mfu_msg', rawurlencode( 'No se detectaron cambios aplicables.' ), $back ) );
+					exit;
+				}
+
+				global $wpdb;
+				$table = MFU_DB::table( 'updates' );
+				$evidence = array(
+					'facts' => array( 'summary' => $summary ),
+					'sources' => array(
+						array( 'url' => $source_url, 'title' => $original_title !== '' ? $original_title : 'Noticia externa' ),
+					),
+					'external_news_url' => $source_url,
+					'external_news_text' => mb_substr( $article_text, 0, 20000 ),
+					'updated_content' => $updated_content,
+				);
+				$wpdb->insert(
+					$table,
+					array(
+						'festival_id' => (int) $festival_id,
+						'detected_at' => current_time( 'mysql' ),
+						'status' => 'pending_review',
+						'diffs_json' => wp_json_encode( $diffs ),
+						'evidence_json' => wp_json_encode( $evidence ),
+						'summary' => $summary,
+					),
+					array( '%d', '%s', '%s', '%s', '%s', '%s' )
+				);
+				$update_id = (int) $wpdb->insert_id;
+				delete_transient( $this->get_external_news_transient_key() );
+				wp_safe_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Actualizacion preparada.' ), 'update_id' => $update_id ), $back ) );
+				exit;
+			}
+
+			$author_id = $this->get_preferred_author_id();
+			$internal_links = array(
+				'agenda' => home_url( '/agenda-festivales/' ),
+			);
+			$style_catalog = $this->get_style_catalog_links();
+			$draft = $ai->rewrite_external_news_to_post( $source_url, $article_text, $style_catalog, $internal_links, $original_title );
+			if ( is_wp_error( $draft ) ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( $draft->get_error_message() ), $back ) );
+				exit;
+			}
+
+			$title = isset( $draft['title'] ) ? (string) $draft['title'] : '';
+			$excerpt = isset( $draft['excerpt'] ) ? (string) $draft['excerpt'] : '';
+			$content = isset( $draft['content_html'] ) ? (string) $draft['content_html'] : '';
+			$slug = isset( $draft['slug'] ) ? sanitize_title( (string) $draft['slug'] ) : '';
+			$yoast_title = isset( $draft['yoast_title'] ) ? (string) $draft['yoast_title'] : '';
+			$yoast_desc = isset( $draft['yoast_metadesc'] ) ? (string) $draft['yoast_metadesc'] : '';
+			$focus_kw = isset( $draft['focus_keyphrase'] ) ? (string) $draft['focus_keyphrase'] : '';
+			$style_slugs = isset( $draft['style_slugs'] ) && is_array( $draft['style_slugs'] ) ? array_map( 'sanitize_title', $draft['style_slugs'] ) : array();
+
+			if ( trim( $title ) === '' || trim( $content ) === '' ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( 'La IA no devolvio contenido valido.' ), $back ) );
+				exit;
+			}
+			if ( $slug === '' ) {
+				$slug = sanitize_title( $title );
+			}
+
+			$post_id = wp_insert_post(
+				array(
+					'post_type' => 'post',
+					'post_status' => 'draft',
+					'post_title' => $title,
+					'post_content' => $content,
+					'post_excerpt' => $excerpt,
+					'post_author' => $author_id,
+					'post_name' => $slug,
+				),
+				true
+			);
+			if ( is_wp_error( $post_id ) ) {
+				wp_safe_redirect( add_query_arg( 'mfu_err', rawurlencode( $post_id->get_error_message() ), $back ) );
+				exit;
+			}
+			$post_id = (int) $post_id;
+
+			$cat_act = get_term_by( 'slug', 'actualidad', 'category' );
+			if ( $cat_act && ! is_wp_error( $cat_act ) ) {
+				wp_set_post_terms( $post_id, array( (int) $cat_act->term_id ), 'category', false );
+			}
+			$cat_uncat = get_term_by( 'slug', 'sin-categorizar', 'category' );
+			if ( $cat_uncat && ! is_wp_error( $cat_uncat ) ) {
+				wp_remove_object_terms( $post_id, array( (int) $cat_uncat->term_id ), 'category' );
+			}
+
+			if ( ! empty( $style_slugs ) ) {
+				$valid = array();
+				foreach ( $style_slugs as $s ) {
+					if ( $s === '' ) {
+						continue;
+					}
+					$term = get_term_by( 'slug', $s, 'estilo_musical' );
+					if ( $term && ! is_wp_error( $term ) ) {
+						$valid[] = (int) $term->term_id;
+					}
+				}
+				if ( ! empty( $valid ) ) {
+					wp_set_post_terms( $post_id, $valid, 'estilo_musical', false );
+				}
+			}
+
+			if ( $yoast_title !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_title', $yoast_title );
+			}
+			if ( $yoast_desc !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_metadesc', $yoast_desc );
+			}
+			if ( $focus_kw !== '' ) {
+				update_post_meta( $post_id, '_yoast_wpseo_focuskw', $focus_kw );
+			}
+			update_post_meta( $post_id, '_mfu_external_news_url', $source_url );
+
+			delete_transient( $this->get_external_news_transient_key() );
+			wp_safe_redirect( add_query_arg( array( 'mfu_msg' => rawurlencode( 'Borrador creado.' ), 'post_id' => $post_id ), $back ) );
+			exit;
+		}
+
+		public function render_add_festival_page() {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return;
 		}
 
 		$notice = isset( $_GET['mfu_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['mfu_msg'] ) ) : '';
@@ -6071,14 +7015,18 @@ private function test_apify_instagram( $token, $actor_id, $input_value, $max_pos
 			return;
 		}
 
-		$festival_id = (int) $update->festival_id;
-		$this->apply_diffs_to_festival( $festival_id, $diffs );
-		$force_content_update = ( $applied_by === 0 );
-		$this->maybe_update_content_from_diffs( $festival_id, $diffs, $update, $force_content_update );
+			$festival_id = (int) $update->festival_id;
+			$this->apply_diffs_to_festival( $festival_id, $diffs );
+			$payload = json_decode( (string) $update->evidence_json, true );
+			$force_content_update = ( $applied_by === 0 );
+			// Press releases are treated as authoritative input; apply proposed content even if global toggle is off.
+			if ( is_array( $payload ) && ! empty( $payload['press_release'] ) ) {
+				$force_content_update = true;
+			}
+			$this->maybe_update_content_from_diffs( $festival_id, $diffs, $update, $force_content_update );
 
-		$payload = json_decode( (string) $update->evidence_json, true );
-		$updated_content = ( is_array( $payload ) && ! empty( $payload['updated_content'] ) ) ? (string) $payload['updated_content'] : '';
-		$evidence = is_array( $payload ) ? $payload : array();
+			$updated_content = ( is_array( $payload ) && ! empty( $payload['updated_content'] ) ) ? (string) $payload['updated_content'] : '';
+			$evidence = is_array( $payload ) ? $payload : array();
 		if ( $applied_by === null ) {
 			$applied_by = get_current_user_id();
 		}
